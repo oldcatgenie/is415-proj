@@ -147,16 +147,31 @@ postal_code_geom <- unique_postal_code %>%
   mutate(X_coord = as.numeric(1.1), Y_coord = as.numeric(1.1))
 ```
 
+```{r}
+postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
+```
+
+
 ```{r warning=FALSE, message=FALSE}
-for (row_num in 4001:6000) {
-  Sys.sleep(0.775)
-  postal_code = postal_code_geom[row_num,]["postal_code"]
-  if (!(postal_code_geom[row_num,]["X_coord"] == as.numeric(1.1) | is.na(postal_code_geom[row_num,]["X_coord"]))) next
+for (row_num in 20001:24217) {
+  postal_code <- postal_code_geom[row_num,]["postal_code"]
+  if (nchar(postal_code) == 5) {
+    postal_code <- paste0("0", postal_code)
+  }
+  if (!(postal_code_geom[row_num,]["X_coord"] == as.numeric(1.1))) next
   else {
+    Sys.sleep(0.8)
     tryCatch({coords <- call_onemap(postal_code)},
              error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-    postal_code_geom[row_num, ]["X_coord"] <- as.numeric(coords[["X"]][1])
-    postal_code_geom[row_num, ]["Y_coord"] <- as.numeric(coords[["Y"]][1])
+    if ("X" %in% names(coords)) {
+      postal_code_geom[row_num, ]["X_coord"] <- as.numeric(coords[["X"]][1])
+      postal_code_geom[row_num, ]["Y_coord"] <- as.numeric(coords[["Y"]][1])     
+    }
+    else {
+      postal_code_geom[row_num, ]["X_coord"] <- NA
+      postal_code_geom[row_num, ]["Y_coord"] <- NA
+    }
+
   }
 }
 ```
@@ -169,6 +184,7 @@ NA == as.numeric(1.1)
 write_csv(postal_code_geom, "data/aspatial/postal_code_geom.csv")
 ```
 
+<<<<<<< Updated upstream
 
 # Clean SSIC file, title based primary ssic code, remove columns that are redundant
 
@@ -240,5 +256,31 @@ corp_info_sliced_ssic_code <- corp_info %>%
 ```{r}
 corp_info <- left_join(corp_info_sliced_ssic_code,ssic,by=c('primary_ssic_code' = "SSIC 2020"))
 names(corp_info)[names(corp_info) == 'primary_ssic_code.y'] <- 'primary_ssic_category_description'
+=======
+```{r}
+# coords <- call_onemap("089057")
+nchar("89057") == 5
+nchar("089057") == 5
+```
+
+```{r warning=FALSE, message=FALSE}
+for (row_num in 1:10000) {
+  postal_code <- postal_code_geom[row_num,]["postal_code"]
+  if (nchar(postal_code) == 5) {
+    postal_code <- paste0("0", postal_code)
+    Sys.sleep(0.8)
+    tryCatch({coords <- call_onemap(postal_code)},
+             error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+    if ("X" %in% names(coords)) {
+      postal_code_geom[row_num, ]["X_coord"] <- as.numeric(coords[["X"]][1])
+      postal_code_geom[row_num, ]["Y_coord"] <- as.numeric(coords[["Y"]][1])     
+    }
+    else {
+      postal_code_geom[row_num, ]["X_coord"] <- NA
+      postal_code_geom[row_num, ]["Y_coord"] <- NA
+    }
+  }
+}
+>>>>>>> Stashed changes
 ```
 
