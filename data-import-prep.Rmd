@@ -1,0 +1,54 @@
+---
+title: "Data Import and Preparation"
+author: "Eugene CHEONG Wei Herng"
+date: "10/22/2020"
+output:
+  html_document:
+    theme: spacelab
+    highlight: tango
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    code:folding: show
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import Required Libraries
+
+```{r}
+packages = c('tidyverse', 'httr', 'jsonlite')
+for (p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+    }
+  library(p,character.only = T)
+}
+```
+
+# Import Aspatial Data from Folder
+
+```{r}
+filename = "data/aspatial/acra-information-on-corporate-entities-a.csv"
+business_csv <- read_csv(filename, na = c("na")) %>%
+  select("uen",
+         "uen_issue_date",
+         "entity_name",
+         "primary_ssic_code",
+         "postal_code",
+         "entity_status_description")
+glimpse(business_csv)
+```
+
+```{r}
+na_records <- business_csv[rowSums(is.na(business_csv)) > 0, ]
+na_records
+```
+
+```{r}
+unique(business_csv$`entity_status_description`)
+```
+
