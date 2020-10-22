@@ -32,23 +32,140 @@ for (p in packages){
 # Import Aspatial Data from Folder
 
 ```{r}
-filename = "data/aspatial/acra-information-on-corporate-entities-a.csv"
-business_csv <- read_csv(filename, na = c("na")) %>%
-  select("uen",
-         "uen_issue_date",
-         "entity_name",
+file_dir <- "data/aspatial/"
+file_list <- c("acra-information-on-corporate-entities-a.csv",
+               "acra-information-on-corporate-entities-b.csv",
+               "acra-information-on-corporate-entities-c.csv",
+               "acra-information-on-corporate-entities-d.csv",
+               "acra-information-on-corporate-entities-e.csv",
+               "acra-information-on-corporate-entities-f.csv",
+               "acra-information-on-corporate-entities-g.csv",
+               "acra-information-on-corporate-entities-h.csv",
+               "acra-information-on-corporate-entities-i.csv",
+               "acra-information-on-corporate-entities-j.csv",
+               "acra-information-on-corporate-entities-k.csv",
+               "acra-information-on-corporate-entities-l.csv",
+               "acra-information-on-corporate-entities-m.csv",
+               "acra-information-on-corporate-entities-n.csv",
+               "acra-information-on-corporate-entities-o.csv",
+               "acra-information-on-corporate-entities-others.csv",
+               "acra-information-on-corporate-entities-p.csv",
+               "acra-information-on-corporate-entities-q.csv",
+               "acra-information-on-corporate-entities-r.csv",
+               "acra-information-on-corporate-entities-s.csv",
+               "acra-information-on-corporate-entities-t.csv",
+               "acra-information-on-corporate-entities-u.csv",
+               "acra-information-on-corporate-entities-v.csv",
+               "acra-information-on-corporate-entities-w.csv",
+               "acra-information-on-corporate-entities-x.csv",
+               "acra-information-on-corporate-entities-y.csv",
+               "acra-information-on-corporate-entities-z.csv")
+```
+
+```{r}
+prep_data <- function(file_dir, file_list, start_year, end_year) {
+  for (file in file_list) {
+    biz_csv <- read_csv(paste0(file_dir, file),
+                        col_types = cols(primary_ssic_code = "c")) %>%
+      filter(entity_status_description %in% c("Live", "Live Company")) %>%
+      mutate(registration_year = format(as.Date(uen_issue_date, format="%Y-%m-%d"),"%Y")) %>%
+      filter(registration_year >= start_year & registration_year <= end_year) %>%
+      select("uen",
+         "registration_year",
          "primary_ssic_code",
-         "postal_code",
-         "entity_status_description")
-glimpse(business_csv)
+         "postal_code")
+    if (!exists("result_csv")) {
+      result_csv <- data.frame(biz_csv)
+    } else {
+      result_csv <- bind_rows(result_csv, biz_csv)
+      print(paste0(file, " has been successfully processed."))
+    }
+  }
+  write_csv(result_csv, "data/aspatial/sg-corp-info.csv")
+  print("Completed. Please see newly created .csv file for results.")
+}
 ```
 
 ```{r}
-na_records <- business_csv[rowSums(is.na(business_csv)) > 0, ]
-na_records
+prep_data(file_dir, file_list, 2017, 2019)
 ```
 
 ```{r}
-unique(business_csv$`entity_status_description`)
+corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
+baseURL <- "https://developers.onemap.sg/"
+end_point <- "commonapi/search?"
+param_search <- "searchVal="
+other_param <- "&returnGeom=Y&getAddrDetails=N"
+postal_code = "579722"
+API_call <- paste0(baseURL, end_point, param_search, postal_code, other_param)
+API_call
+```
+
+```{r}
+req <- GET(API_call)
+```
+
+```{r}
+json <- content(req, as = "text")
+json_info <- fromJSON(json)
+```
+
+```{r}
+json_info$results["X"]
+```
+
+
+```{r}
+call_onemap <- function(postal_code) {
+  corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
+  baseURL <- "https://developers.onemap.sg/"
+  end_point <- "commonapi/search?"
+  param_search <- "searchVal="
+  other_param <- "&returnGeom=Y&getAddrDetails=N"
+  req <- GET(paste0(baseURL, end_point, param_search, postal_code, other_param))
+  json <- content(req, as = "text")
+  json_info <- fromJSON(json)
+  return (c(json_info$results["X"], json_info$results["Y"]))
+}
+```
+
+```{r}
+corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
+```
+
+```{r}
+length(unique(corp_info$postal_code))
+```
+
+```{r}
+unique_postal_code <- as.data.frame(unique(corp_info$postal_code))
+colnames(unique_postal_code)[colnames(unique_postal_code) == "unique(corp_info$postal_code)"] <- "postal_code"
+```
+
+```{r}
+postal_code_geom <- unique_postal_code %>%
+  mutate(X_coord = as.numeric(1.1), Y_coord = as.numeric(1.1))
+```
+
+```{r warning=FALSE, message=FALSE}
+for (row_num in 4001:6000) {
+  Sys.sleep(0.775)
+  postal_code = postal_code_geom[row_num,]["postal_code"]
+  if (!(postal_code_geom[row_num,]["X_coord"] == as.numeric(1.1) | is.na(postal_code_geom[row_num,]["X_coord"]))) next
+  else {
+    tryCatch({coords <- call_onemap(postal_code)},
+             error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+    postal_code_geom[row_num, ]["X_coord"] <- as.numeric(coords[["X"]][1])
+    postal_code_geom[row_num, ]["Y_coord"] <- as.numeric(coords[["Y"]][1])
+  }
+}
+```
+
+```{r}
+NA == as.numeric(1.1)
+```
+
+```{r}
+write_csv(postal_code_geom, "data/aspatial/postal_code_geom.csv")
 ```
 
