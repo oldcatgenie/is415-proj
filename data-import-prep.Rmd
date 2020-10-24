@@ -70,6 +70,7 @@ prep_data <- function(file_dir, file_list, start_year, end_year) {
       filter(entity_status_description %in% c("Live", "Live Company")) %>%
       mutate(registration_year = format(as.Date(uen_issue_date, format="%Y-%m-%d"),"%Y")) %>%
       filter(registration_year >= start_year & registration_year <= end_year) %>%
+      mutate(`primary_ssic_code` = substr(primary_ssic_code, start = 1, stop = 2)) %>%
       select("uen",
          "registration_year",
          "primary_ssic_code",
@@ -242,21 +243,18 @@ ssic <- left_join(ssic,ssic1,by=c('category' = "SSIC 2020")) %>%
 
 ```{r}
 names(ssic)[names(ssic) == 'SSIC 2020 Title.y'] <- 'primary_ssic_code'
+write_csv(ssic, "data/aspatial/ssic2020.csv")
 ```
 
-# Mutate primary ssic code to 2 digits only so as to match with the 'SSIC 2020' column
-
-```{r}
-corp_info_sliced_ssic_code <- corp_info %>%
-  mutate(`primary_ssic_code` = substr(primary_ssic_code, start = 1, stop = 2))
-```
 
 # Join corp_info with ssic categories and respective descriptions
 
 ```{r}
 corp_info <- left_join(corp_info_sliced_ssic_code,ssic,by=c('primary_ssic_code' = "SSIC 2020"))
 names(corp_info)[names(corp_info) == 'primary_ssic_code.y'] <- 'primary_ssic_category_description'
-=======
+```
+
+
 ```{r}
 # coords <- call_onemap("089057")
 nchar("89057") == 5
@@ -281,6 +279,5 @@ for (row_num in 1:10000) {
     }
   }
 }
->>>>>>> Stashed changes
 ```
 
