@@ -1,0 +1,406 @@
+---
+title: "Spatial Cluster Analysis"
+author: "Eugene CHEONG Wei Herng"
+date: "10/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Intalling Required Packages
+
+```{r}
+packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse')
+for (p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+
+## Data Import and Preparation
+
+### Importing Aspatial and Spatial Data
+```{r}
+corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
+corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
+ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
+postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
+mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL")
+planning_area <- mpsz %>%
+  group_by(PLN_AREA_N) %>%
+  summarise(geometry = st_union(geometry)) %>%
+  ungroup() %>%
+  filter(!(PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
+                             "CENTRAL WATER CATCHMENT",
+                             "CHANGI BAY",
+                             "MARINA SOUTH",
+                             "SIMPANG",
+                             "SOUTHERN ISLANDS",
+                             "STRAITS VIEW",
+                             "TENGAH")))
+```
+### Checking the CRS for Spatial Data
+```{r}
+planning_area
+```
+
+```{r}
+st_crs(planning_area)
+```
+
+### Transforming the CRS for Spatial Data
+
+```{r}
+planning_area_3414 <- st_transform(planning_area, 3414)
+st_crs(planning_area_3414)
+```
+
+### Converting to Spatial or Spatial* Equivalents
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged, "Spatial")
+```
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
+```
+
+```{r}
+planning_area_sp <- as(planning_area_3414, "Spatial")
+```
+
+```{r}
+plot(planning_area_sp, border="darkgrey")+
+plot(corp_info_merged_sp, add=TRUE)
+```
+
+```{r}
+unique(corp_info_merged$category)
+```
+
+```{r}
+for (category_id in unique(corp_info_merged$category)) {
+  corp_with_category <- corp_info_merged %>%
+    filter(category == category_id)
+  planning_area_3414[, paste0("Category ", category_id)]<- lengths(st_intersects(planning_area_3414, corp_with_category))
+}
+```
+
+```{r}
+planning_area_3414 <- planning_area_3414 %>%
+  mutate(Total = rowSums(across("Category G":"Category O")))
+```
+
+```{r}
+print(mean(planning_area_3414$Total))
+```
+
+```{r}
+planning_area_3414 <- planning_area_3414 %>%
+  mutate(`Cat G Prop` = case_when(Total != 0 ~ `Category G`/Total * 1000,
+                                             Total == 0 ~ 0)) %>%
+  mutate(`Cat F Prop` = case_when(Total != 0 ~ `Category F`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat H Prop` = case_when(Total != 0 ~ `Category H`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat C Prop` = case_when(Total != 0 ~ `Category C`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat N Prop` = case_when(Total != 0 ~ `Category N`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat I Prop` = case_when(Total != 0 ~ `Category I`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat S Prop` = case_when(Total != 0 ~ `Category S`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat M Prop` = case_when(Total != 0 ~ `Category M`/Total * 1000,
+                                       Total == 0 ~ 0)) %>%
+  mutate(`Cat Q Prop` = case_when(Total != 0 ~ `Category Q`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat L Prop` = case_when(Total != 0 ~ `Category L`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat J Prop` = case_when(Total != 0 ~ `Category J`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat R Prop` = case_when(Total != 0 ~ `Category R`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat P Prop` = case_when(Total != 0 ~ `Category P`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat E Prop` = case_when(Total != 0 ~ `Category E`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat K Prop` = case_when(Total != 0 ~ `Category K`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat D Prop` = case_when(Total != 0 ~ `Category D`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat A Prop` = case_when(Total != 0 ~ `Category A`/Total * 1000,
+                                         Total == 0 ~ 0)) %>%
+  mutate(`Cat O Prop` = case_when(Total != 0 ~ `Category O`/Total * 1000,
+                                         Total == 0 ~ 0))
+  
+```
+
+## Exploratory Data Analysis
+
+```{r}
+qtm(planning_area_3414, "Cat H Prop")
+```
+
+```{r}
+qtm(planning_area_3414, "Total")
+```
+
+```{r}
+planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
+```
+
+
+
+### Correlation Analysis
+
+```{r}
+cluster_vars.cor = cor(planning_area_3414_derived[, 21:38])
+corrplot.mixed(cluster_vars.cor,
+         lower = "ellipse", 
+               upper = "number",
+               tl.pos = "lt",
+               diag = "l",
+               tl.col = "black")
+```
+
+## Extracting Clustering Variables
+
+```{r}
+cluster_vars <- planning_area_3414_derived %>%
+  select("PLN_AREA_N", ends_with("Prop"))
+head(cluster_vars,10)
+```
+
+```{r}
+row.names(cluster_vars) <- cluster_vars$`PLN_AREA_N`
+head(cluster_vars,10)
+```
+
+```{r}
+sg_business <- select(cluster_vars, c(2:19))
+row.names(sg_business) <- cluster_vars$`PLN_AREA_N`
+head(sg_business, 10)
+```
+
+## Data Standardisation
+
+### Min-max Standardisation
+```{r}
+sg_business.minmax <- normalize(sg_business)
+summary(sg_business.minmax)
+```
+
+### Z-score Standardisation
+```{r}
+sg_business.zscore <- scale(sg_business)
+summary(sg_business.zscore)
+```
+
+### Visualising the standardised clustering variables
+```{r}
+r <- ggplot(data=planning_area_3414_derived, 
+             aes(x= `Cat M Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+sg_business_minmax_df <- as.data.frame(sg_business.minmax)
+s <- ggplot(data=sg_business_minmax_df, 
+       aes(x=`Cat M Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue") +
+  ggtitle("Min-Max Standardisation")
+
+sg_business_zscore_df <- as.data.frame(sg_business.zscore)
+z <- ggplot(data=sg_business_zscore_df, 
+       aes(x=`Cat M Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue") +
+  ggtitle("Z-score Standardisation")
+
+ggarrange(r, s, z,
+          ncol = 3,
+          nrow = 1)
+```
+
+## Hierarchical Cluster Analysis
+
+### Computing Proximity Matrix
+
+```{r}
+proxmat <- dist(sg_business, method = 'euclidean')
+```
+
+### Computing Hierarchical Clustering
+
+```{r}
+hclust_ward <- hclust(proxmat, method = 'ward.D')
+```
+
+```{r}
+plot(hclust_ward, cex = 0.6)
+```
+
+### Selecting Optimal Clustering Algorithm
+
+```{r}
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+ac <- function(x) {
+  agnes(sg_business, method = x)$ac
+}
+
+map_dbl(m, ac)
+```
+
+With reference to the output above, we can see that Ward’s method provides the strongest clustering structure among the four methods assessed. Hence, in the subsequent analysis, only Ward’s method will be used.
+
+### Determining Optimal Clusters
+
+```{r}
+set.seed(54321)
+gap_stat <- clusGap(sg_business, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+# Print the result
+print(gap_stat, method = "firstmax")
+```
+
+```{r}
+fviz_gap_stat(gap_stat)
+```
+
+### Interpreting the Dendrogram
+
+```{r}
+plot(hclust_ward, cex = 0.6)
+rect.hclust(hclust_ward, k = 10, border = 2:5)
+```
+
+### Visually Driven Hierarchical Analysis
+
+```{r}
+sg_business_mat <- data.matrix(sg_business)
+```
+
+```{r}
+heatmaply(normalize(sg_business_mat),
+          Colv=NA,
+          dist_method = "euclidean",
+          hclust_method = "ward.D",
+          seriate = "OLO",
+          colors = Blues,
+          k_row = 10,
+          margins = c(NA,200,60,NA),
+          fontsize_row = 4,
+          fontsize_col = 5,
+          main="Geographic Segmentation of Singapore by Business Prominence",
+          xlab = "Business Prominence",
+          ylab = "Singapore's Planning Areas"
+          )
+```
+
+### Mapping the Clusters Formed
+
+```{r}
+groups <- as.factor(cutree(hclust_ward, k=10))
+```
+
+```{r}
+sg_biz_cluster <- cbind(planning_area_3414, as.matrix(groups)) %>%
+  rename(`CLUSTER`=`as.matrix.groups.`)
+```
+
+```{r}
+qtm(sg_biz_cluster, "CLUSTER")
+```
+
+## Spatially Constrained Clustering (SKATER)
+
+### Conversion to SpatialPolygonsDataFrame
+
+```{r}
+planning_area_3414_sp <- as_Spatial(planning_area_3414)
+```
+
+### Computing Neighbour List
+
+```{r}
+sg.nb <- poly2nb(planning_area_3414_sp)
+summary(sg.nb)
+```
+
+```{r}
+plot(planning_area_3414_sp, border=grey(.5))
+plot(sg.nb, coordinates(planning_area_3414_sp), col="blue", add=TRUE)
+```
+
+### Computing Minimum Spanning Tree
+
+#### Calculate Edge Cost
+
+```{r}
+lcosts <- nbcosts(sg.nb, sg_business)
+```
+
+```{r}
+sg.w <- nb2listw(sg.nb, lcosts, style="B")
+summary(sg.w)
+```
+
+#### Creating Minimum Spanning Tree
+
+```{r}
+sg.mst <- mstree(sg.w)
+```
+
+```{r}
+class(sg.mst)
+```
+
+```{r}
+dim(sg.mst)
+```
+
+```{r}
+head(sg.mst)
+```
+
+```{r}
+plot(planning_area_sp, border=gray(.5))
+plot.mst(sg.mst, coordinates(planning_area_sp), 
+     col="blue", cex.lab=0.7, cex.circles=0.005, add=TRUE)
+```
+
+```{r}
+skaterclust <- skater(sg.mst[,1:2], sg_business, method = "euclidean", 9)
+```
+
+```{r}
+str(skaterclust)
+```
+
+```{r}
+clustergrps <- skaterclust$groups
+table(clustergrps)
+```
+
+```{r}
+plot(planning_area_sp, border=gray(.5))
+plot(skaterclust, coordinates(planning_area_3414_sp), cex.lab=.7,
+     groups.colors=c("red","green","blue", "brown", "pink"), cex.circles=0.005, add=TRUE)
+```
+
+```{r}
+groups_mat <- as.matrix(skaterclust$groups)
+sg_biz_spatialcluster <- cbind(sg_biz_cluster, as.factor(groups_mat)) %>%
+  rename(`SP_CLUSTER`=`as.factor.groups_mat.`)
+qtm(sg_biz_spatialcluster, "SP_CLUSTER")
+```
+
