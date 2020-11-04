@@ -2,7 +2,15 @@
 title: "Spatial Cluster Analysis"
 author: "Eugene CHEONG Wei Herng"
 date: "10/24/2020"
-output: html_document
+output:
+  html_document:
+    theme: spacelab
+    highlight: tango
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    code:folding: show
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Intalling Required Packages
 
-```{r}
+```{r message=FALSE}
 packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse')
 for (p in packages){
   if(!require(p, character.only = T)){
@@ -142,6 +150,162 @@ planning_area_3414 <- planning_area_3414 %>%
 
 ## Exploratory Data Analysis
 
+### Visualisation of Statistics
+
+```{r}
+ggplot(data=planning_area_3414, aes(x=`Category M`)) +
+  geom_histogram(bins=20, color="black", fill="light blue")
+```
+
+```{r}
+ggplot(data=planning_area_3414, aes(x=`Category M`)) +
+  geom_boxplot(color="black", fill="light blue")
+```
+
+```{r}
+ggplot(data=planning_area_3414, aes(x=`Cat M Prop`)) +
+  geom_histogram(bins=20, color="black", fill="light blue")
+```
+
+```{r}
+ggplot(data=planning_area_3414, aes(x=`Cat M Prop`)) +
+  geom_boxplot(color="black", fill="light blue")
+```
+
+```{r}
+cat_g <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat G Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_f <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat F Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_h <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat H Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_c <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat C Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_n <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat N Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_i <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat I Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+```
+
+```{r}
+ggarrange(cat_g, cat_f, cat_h, cat_c, cat_n, cat_i, 
+          ncol = 3, 
+          nrow = 2)
+```
+
+```{r}
+cat_s <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat S Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_m <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat M Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_q <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat Q Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_l <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat L Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_j <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat J Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_r <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat R Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+```
+
+```{r}
+ggarrange(cat_s, cat_m, cat_q, cat_l, cat_j, cat_r, 
+          ncol = 3, 
+          nrow = 2)
+```
+
+```{r}
+cat_p <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat P Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_e <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat E Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_k <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat K Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_d <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat D Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_a <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat A Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+
+cat_o <- ggplot(data=planning_area_3414, 
+             aes(x= `Cat O Prop`)) +
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue")
+```
+
+```{r}
+ggarrange(cat_p, cat_e, cat_k, cat_d, cat_a, cat_o, 
+          ncol = 3, 
+          nrow = 2)
+```
+
+### Choropleths
+
 ```{r}
 qtm(planning_area_3414, "Cat H Prop")
 ```
@@ -150,13 +314,11 @@ qtm(planning_area_3414, "Cat H Prop")
 qtm(planning_area_3414, "Total")
 ```
 
+### Correlation Analysis
+
 ```{r}
 planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
 ```
-
-
-
-### Correlation Analysis
 
 ```{r}
 cluster_vars.cor = cor(planning_area_3414_derived[, 21:38])
