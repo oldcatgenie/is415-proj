@@ -9,7 +9,7 @@
 
 
 #----- Importing Packages ---------
-packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinyWidgets', 'DT')
+packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinyWidgets', 'DT','datastructures')
 for (p in packages){
     if(!require(p, character.only = T)){
         install.packages(p)
@@ -52,50 +52,52 @@ planning_area_sp <- as(planning_area_3414, "Spatial")
 for (category_id in unique(corp_info_merged$category)) {
     corp_with_category <- corp_info_merged_sf %>%
         filter(category == category_id)
-    planning_area_3414[, paste0("Category ", category_id)]<- lengths(st_intersects(planning_area_3414, corp_with_category))
+    planning_area_3414[, paste0("Category", category_id)]<- lengths(st_intersects(planning_area_3414, corp_with_category))
 }
 
 planning_area_3414 <- planning_area_3414 %>%
-    mutate(Total = rowSums(across("Category G":"Category O")))
+    mutate(Total = rowSums(across("CategoryG":"CategoryO")))
 
 planning_area_3414 <- planning_area_3414 %>%
-    mutate(`Cat G Prop` = case_when(Total != 0 ~ `Category G`/Total * 1000,
+    mutate(`CatGProp` = case_when(Total != 0 ~ `CategoryG`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat F Prop` = case_when(Total != 0 ~ `Category F`/Total * 1000,
+    mutate(`CatFProp` = case_when(Total != 0 ~ `CategoryF`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat H Prop` = case_when(Total != 0 ~ `Category H`/Total * 1000,
+    mutate(`CatHProp` = case_when(Total != 0 ~ `CategoryH`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat C Prop` = case_when(Total != 0 ~ `Category C`/Total * 1000,
+    mutate(`CatCProp` = case_when(Total != 0 ~ `CategoryC`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat N Prop` = case_when(Total != 0 ~ `Category N`/Total * 1000,
+    mutate(`CatNProp` = case_when(Total != 0 ~ `CategoryN`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat I Prop` = case_when(Total != 0 ~ `Category I`/Total * 1000,
+    mutate(`CatIProp` = case_when(Total != 0 ~ `CategoryI`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat S Prop` = case_when(Total != 0 ~ `Category S`/Total * 1000,
+    mutate(`CatSProp` = case_when(Total != 0 ~ `CategoryS`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat M Prop` = case_when(Total != 0 ~ `Category M`/Total * 1000,
+    mutate(`CatMProp` = case_when(Total != 0 ~ `CategoryM`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat Q Prop` = case_when(Total != 0 ~ `Category Q`/Total * 1000,
+    mutate(`CatQProp` = case_when(Total != 0 ~ `CategoryQ`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat L Prop` = case_when(Total != 0 ~ `Category L`/Total * 1000,
+    mutate(`CatLProp` = case_when(Total != 0 ~ `CategoryL`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat J Prop` = case_when(Total != 0 ~ `Category J`/Total * 1000,
+    mutate(`CatJProp` = case_when(Total != 0 ~ `CategoryJ`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat R Prop` = case_when(Total != 0 ~ `Category R`/Total * 1000,
+    mutate(`CatRProp` = case_when(Total != 0 ~ `CategoryR`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat P Prop` = case_when(Total != 0 ~ `Category P`/Total * 1000,
+    mutate(`CatPProp` = case_when(Total != 0 ~ `CategoryP`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat E Prop` = case_when(Total != 0 ~ `Category E`/Total * 1000,
+    mutate(`CatEProp` = case_when(Total != 0 ~ `CategoryE`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat K Prop` = case_when(Total != 0 ~ `Category K`/Total * 1000,
+    mutate(`CatKProp` = case_when(Total != 0 ~ `CategoryK`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat D Prop` = case_when(Total != 0 ~ `Category D`/Total * 1000,
+    mutate(`CatDProp` = case_when(Total != 0 ~ `CategoryD`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat A Prop` = case_when(Total != 0 ~ `Category A`/Total * 1000,
+    mutate(`CatAProp` = case_when(Total != 0 ~ `CategoryA`/Total * 1000,
                                     Total == 0 ~ 0)) %>%
-    mutate(`Cat O Prop` = case_when(Total != 0 ~ `Category O`/Total * 1000,
+    mutate(`CatOProp` = case_when(Total != 0 ~ `CategoryO`/Total * 1000,
                                     Total == 0 ~ 0))
 
+# -------For Correlation Analysis --------------------------
+planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
 
 # ------- UI -----------
 ui <- fluidPage(theme=shinytheme("darkly"),
@@ -175,15 +177,81 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                tabPanel("EDA", value="eda", fluid=TRUE, icon=icon("chart-pie"),
                         # Sidebar with a slider input for number of bins 
                         sidebarLayout(fluid=TRUE,
-                            sidebarPanel(
-                                div(style = "max-height: 40vh; overflow-y: auto;", 
-                                    title = "Industries", width = 3,
-                                    uiOutput("industries")
-                                )
+                            sidebarPanel(width=3,
+                              conditionalPanel(
+                                'input.edaTab === "Box Map"',
+                                selectInput(inputId="EdaIndustryBoxMap",
+                                            label="Select Industry",
+                                            choices=c(unique(ssic2020$primary_ssic_code)),
+                                            selected="AGRICULTURE AND FISHING",
+                                            multiple=FALSE,
+                                            width="100%"
+                                ),
+                              ),
+                              conditionalPanel(
+                                'input.edaTab === "Histogram"',
+                                  fluidRow(
+                                    column(6,
+                                           checkboxInput(inputId="absoluteHist",
+                                                         label="Absolute Value",
+                                                         value=TRUE,
+                                                         width="100%")
+                                    ),
+                                    column(6,
+                                           checkboxInput(inputId="LQHist",
+                                                         label="Location Quotient",
+                                                         value=TRUE,
+                                                         width="100%")
+                                    )
+                                  ),
+                                selectInput(inputId="EdaIndustryHist",
+                                            label="Select Industry",
+                                            choices=c(unique(ssic2020$primary_ssic_code)),
+                                            selected="AGRICULTURE AND FISHING",
+                                            multiple=FALSE,
+                                            width="100%"
+                                ),
+                              ),
+                              conditionalPanel(
+                                'input.edaTab === "Correlation Analysis"',
+                                selectInput(inputId="ClusterEDAfields",
+                                            label="Measure",
+                                            choices=c(unique(ssic2020$primary_ssic_code)),
+                                            selected=c(unique(ssic2020$primary_ssic_code)),
+                                            multiple=TRUE,
+                                            width="100%"
+                                ),
+                              
+                              ),
                             ),
                             
-                            # Show a plot of the generated distribution
-                            mainPanel(
+                            mainPanel(width=9,
+                              fluidRow(
+                                column(10, align="center", offset = 1,
+                                       tabsetPanel(
+                                         id = "edaTab",
+                                         tabPanel("Box Map"),
+                                         tabPanel("Histogram", br(),
+                                                  conditionalPanel(
+                                                    'input.absoluteHist',
+                                                      column(6,
+                                                           plotlyOutput(outputId="edaOutput1", width = "100%", height = "400px", inline = FALSE)
+                                                      )
+                                                    ),
+                                                  conditionalPanel(
+                                                    'input.LQHist',
+                                                    column(6,
+                                                           plotlyOutput(outputId="edaOutput2", width = "100%", height = "400px", inline = FALSE)
+                                                    )
+                                                  )
+                                        ),
+                                         tabPanel("Correlation Analysis",
+                                                  plotOutput("edaCorrPlot",
+                                                             width="800px",
+                                                             height="800px"))
+                                       )
+                                )
+                              )
                             )
                         )
                ),
@@ -199,7 +267,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                       value = 30)
                                       ),
                                       
-                                      # Show a plot of the generated distribution
+                                      # Kernel Density Map
                                       mainPanel(
                                       )
                         )
@@ -225,9 +293,10 @@ ui <- fluidPage(theme=shinytheme("darkly"),
     )
 )
 
-# Define server logic required to draw a histogram
+# Define server logic 
 server <- function(input, output) {
     
+    #-------------- Data Page --------------------
     output$corp_info_table = DT::renderDataTable({
         DF <- as.data.frame(corp_info_merged)
         DF <- DF %>% 
@@ -247,9 +316,76 @@ server <- function(input, output) {
         DT::datatable(DF, style = "bootstrap")
     })
     
-    output$industries <- renderUI({checkboxGroupInput('selected_industries',
-                                                      '',
-                                                      c(unique(ssic2020$primary_ssic_code)))})
+    #-------------- EDA ----------------------------
+    # vectorize assign, get and exists for convenience
+    assign_hash <- Vectorize(assign, vectorize.args = c("x", "value"))
+    get_hash <- Vectorize(get, vectorize.args = "x")
+    exists_hash <- Vectorize(exists, vectorize.args = "x")
+    
+    
+    observe({
+      # If Absolute Value for Histogram is selected on checkbox
+      if (input$absoluteHist){
+        
+        # initialize hash
+        abCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+        # assign values to keys
+        keys <- c(unique(ssic2020$primary_ssic_code))
+        value <- paste("Category", unique(ssic2020$category), sep="")
+        
+        assign_hash(keys, value, abCategory)
+        
+        output$edaOutput1 <- renderPlotly({
+          ggplotly(ggplot(data=planning_area_3414, aes_string(x= get_hash(input$EdaIndustryHist, abCategory))) + 
+                     geom_histogram(bins = 20) + xlab(input$EdaIndustryHist) + ggtitle("Absolute Value"))
+          
+        })
+      }
+      
+      # If Location Quotient for Histogram is selected on checkbox
+      if (input$LQHist){
+        
+        # initialize hash
+        LQCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+        # assign values to keys
+        keys <- c(unique(ssic2020$primary_ssic_code))
+        value <- paste("Cat", unique(ssic2020$category), "Prop", sep="")
+        
+        assign_hash(keys, value, LQCategory)
+        
+        output$edaOutput2 <- renderPlotly({
+          ggplotly(ggplot(data=planning_area_3414, aes_string(x= get_hash(input$EdaIndustryHist, LQCategory))) + 
+                     geom_histogram(bins = 20) + xlab(input$EdaIndustryHist)  + ggtitle("Location Quotient"))
+          
+        })
+      }
+    })      
+    
+
+    output$edaCorrPlot <- renderPlot({
+      # initialize hash
+      LQCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+      # assign values to keys
+      keys <- c(unique(ssic2020$primary_ssic_code))
+      value <- paste("Cat", unique(ssic2020$category), "Prop", sep="")
+      
+      assign_hash(keys, value, LQCategory)
+      
+      
+      varSelected <- input$ClusterEDAfields
+      
+      cluster_vars.cor = cor(planning_area_3414_derived[, get_hash(c(varSelected), LQCategory)])
+      
+      corrplot.mixed(cluster_vars.cor,
+                     lower = "ellipse", 
+                     upper = "number",
+                     tl.pos = "lt",
+                     diag = "l",
+                     tl.col = "black")
+    })
+    
+    
+    
     output$distPlot <- renderPlot({
         # generate bins based on input$bins from ui.R
         x    <- faithful[, 2]
