@@ -9,7 +9,7 @@
 
 
 #----- Importing Packages ---------
-packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinyWidgets', 'DT','datastructures')
+packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinyWidgets', 'DT', 'leaflet', 'datastructures')
 for (p in packages){
     if(!require(p, character.only = T)){
         install.packages(p)
@@ -47,7 +47,7 @@ planning_area_3414 <- st_transform(planning_area, 3414)
 #------------- Converting to Spatial or Spatial Equivalents---------------------
 corp_info_merged_sp <- as(corp_info_merged_sf, "Spatial")
 corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
-planning_area_sp <- as(planning_area_3414, "Spatial")
+planning_area_3414_sp <- as(planning_area_3414, "Spatial")
 
 for (category_id in unique(corp_info_merged$category)) {
     corp_with_category <- corp_info_merged_sf %>%
@@ -98,6 +98,15 @@ planning_area_3414 <- planning_area_3414 %>%
 
 # -------For Correlation Analysis --------------------------
 planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
+
+# -------For Clustering ------------------------------------
+cluster_vars <- planning_area_3414_derived %>%
+  select("PLN_AREA_N", ends_with("Prop"))
+
+sg_business <- select(cluster_vars, c(2:19))
+row.names(sg_business) <- cluster_vars$`PLN_AREA_N`
+
+sg_business_mat <- data.matrix(sg_business)
 
 # ------- UI -----------
 ui <- fluidPage(theme=shinytheme("darkly"),
@@ -274,19 +283,43 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                ),
                # ----- Clustering Panel -------------------
                tabPanel("Clustering", value="clustering", fluid=TRUE, icon=icon("globe-asia"),
-                        # Sidebar with a slider input for number of bins 
                         sidebarLayout(fluid=TRUE,
-                                      sidebarPanel(fluid=TRUE,
-                                                   sliderInput("bins",
-                                                               "Number of bins:",
+                                      sidebarPanel(fluid=TRUE, width=3,
+                                                   selectInput(inputId="proximityCal",
+                                                               label="Proximity Calculation",
+                                                               choices=c("euclidean", "maximum", "manhattan", "canberra", "binary", "minkowski"),
+                                                               selected="euclidean",
+                                                               multiple=FALSE,
+                                                               width="100%"
+                                                   ),
+                                                   selectInput(inputId="agglomerationMethod",
+                                                               label="Agglomeration Method",
+                                                               choices=c("ward.D", "ward.D2", "single", "complete", "average", "mcquitty", "median", "centroid"),
+                                                               selected="ward.D",
+                                                               multiple=FALSE,
+                                                               width="100%"
+                                                   ),
+                                                   sliderInput("Clusters",
+                                                               "Number of Clusters:",
                                                                min = 1,
-                                                               max = 50,
-                                                               value = 30)
+                                                               max = 10,
+                                                               value = 5),
+                                                   radioButtons(inputId = "clusteringMethod",
+                                                                label = "Select Clustering Method",
+                                                                inline=TRUE,
+                                                                choices = list("Hierarchical", "Skater"),
+                                                                selected = "Hierarchical"),
                                       ),
                                       
-                                      # Show a plot of the generated distribution
-                                      mainPanel(fluid=TRUE,
-                                                plotOutput("distPlot")
+                                      # Show Clustering Plots
+                                      mainPanel(fluid=TRUE, width=9,
+                                                fluidRow(
+                                                  column(6, leafletOutput("clusteringPlot")),
+                                                  column(6, plotOutput("clusterDendrogram"))
+                                                ),
+                                                fluidRow(
+                                                  column(6, plotlyOutput("geographicSeg"))
+                                                )
                                       )
                         )
                )
@@ -385,14 +418,72 @@ server <- function(input, output) {
     })
     
     
+    #-----------Clustering -------------------------------------------
     
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
+    output$clusterDendrogram <- renderPlot({
+      proxmat <- dist(sg_business, method= input$proximityCal)
+      
+      hclust_ward <- hclust(proxmat, method= input$agglomerationMethod)
+      
+      plot(hclust_ward, cex = 0.6)
+      rect.hclust(hclust_ward, k = input$Clusters, border = 2:5)
+    })
+    
+    output$geographicSeg <- renderPlotly({
+      heatmaply(normalize(sg_business_mat),
+                Colv=NA,
+                dist_method = input$proximityCal,
+                hclust_method = input$agglomerationMethod,
+                seriate = "OLO",
+                colors = Blues,
+                k_row = input$Clusters,
+                margins = c(NA,200,60,NA),
+                fontsize_row = 4,
+                fontsize_col = 5,
+                main="Geographic Segmentation of Singapore by Business Prominence",
+                xlab = "Business Prominence",
+                ylab = "Singapore's Planning Areas"
+      )
+    })
+    
+    output$clusteringPlot <- renderLeaflet({
+      proxmat <- dist(sg_business, method= input$proximityCal)
+      hclust_ward <- hclust(proxmat, method= input$agglomerationMethod)
+      
+      groups <- as.factor(cutree(hclust_ward, k=input$Clusters))
+      
+      sg_biz_cluster <- cbind(planning_area_3414, as.matrix(groups)) %>%
+        rename(`CLUSTER`=`as.matrix.groups.`)
+      
+      if(input$clusteringMethod == "Hierarchical"){
+        cluster_map <- tm_shape(sg_biz_cluster)+
+          tm_fill(col="CLUSTER",
+                  title=" Indicator Clusters")+
+          tm_borders(alpha=0.5)
+      }
+      
+      if (input$clusteringMethod == "Skater") {
+        # -----SKATER -----
+        sg.nb <- poly2nb(planning_area_3414_sp)
+        lcosts <- nbcosts(sg.nb, sg_business)
+        sg.w <- nb2listw(sg.nb, lcosts, style="B")
+        sg.mst <- mstree(sg.w)
+        
+        skaterclust <- skater(sg.mst[,1:2], sg_business, method = input$proximityCal, input$Clusters - 1)
+        
+        clustergrps <- skaterclust$groups
+        groups_mat <- as.matrix(skaterclust$groups)
+        sg_biz_spatialcluster <- cbind(sg_biz_cluster, as.factor(groups_mat)) %>%
+          rename(`SP_CLUSTER`=`as.factor.groups_mat.`)
+        
+        cluster_map <- tm_shape(sg_biz_spatialcluster)+
+          tm_fill(col="SP_CLUSTER",
+                  title=" Indicator Clusters")+
+          tm_borders(alpha=0.5)
+        
+        
+      }
+      tmap_leaflet(cluster_map, in.shiny=TRUE)
     })
 }
 
