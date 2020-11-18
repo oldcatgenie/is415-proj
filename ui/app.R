@@ -25,8 +25,6 @@ ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
 
 postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
 
-mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL")
-
 # ---------- Data Preparation --------------------------
 planning_area <- mpsz %>%
     group_by(PLN_AREA_N) %>%
@@ -41,6 +39,9 @@ planning_area <- mpsz %>%
                                "STRAITS VIEW",
                                "TENGAH")))
 
+# There are no industries under category U and T, hence it is filtered out
+ssic2020_filtered <- ssic2020 %>%
+    filter(!(category %in% c("U", "T")))
 #--------------------- Transforming CRS for spatial data-------------------
 planning_area_3414 <- st_transform(planning_area, 3414)
 
@@ -191,7 +192,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                 'input.edaTab === "Box Map"',
                                 selectInput(inputId="EdaIndustryBoxMap",
                                             label="Select Industry",
-                                            choices=c(unique(ssic2020$primary_ssic_code)),
+                                            choices=c(unique(ssic2020_filtered$primary_ssic_code)),
                                             selected="AGRICULTURE AND FISHING",
                                             multiple=FALSE,
                                             width="100%"
@@ -215,7 +216,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                   ),
                                 selectInput(inputId="EdaIndustryHist",
                                             label="Select Industry",
-                                            choices=c(unique(ssic2020$primary_ssic_code)),
+                                            choices=c(unique(ssic2020_filtered$primary_ssic_code)),
                                             selected="AGRICULTURE AND FISHING",
                                             multiple=FALSE,
                                             width="100%"
@@ -225,8 +226,8 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                 'input.edaTab === "Correlation Analysis"',
                                 selectInput(inputId="ClusterEDAfields",
                                             label="Measure",
-                                            choices=c(unique(ssic2020$primary_ssic_code)),
-                                            selected=c(unique(ssic2020$primary_ssic_code)),
+                                            choices=c(unique(ssic2020_filtered$primary_ssic_code)),
+                                            selected=c(unique(ssic2020_filtered$primary_ssic_code)),
                                             multiple=TRUE,
                                             width="100%"
                                 ),
@@ -239,7 +240,9 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                 column(10, align="center", offset = 1,
                                        tabsetPanel(
                                          id = "edaTab",
-                                         tabPanel("Box Map"),
+                                         tabPanel("Box Map", br(),
+                                                  plotOutput(outputId="boxMapOutput", width = "800px", height="600px", inline = FALSE)
+                                                  ),
                                          tabPanel("Histogram", br(),
                                                   conditionalPanel(
                                                     'input.absoluteHist',
@@ -317,10 +320,12 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                   column(6, leafletOutput("clusteringPlot")),
                                                   column(6, plotOutput("clusterDendrogram"))
                                                 ),
+                                                conditionalPanel("input.agglomerationMethod != 'median' & input.agglomerationMethod != 'centroid'",
                                                 fluidRow(
-                                                  column(6, plotlyOutput("geographicSeg"))
+                                                    column(6, plotlyOutput("geographicSeg"))
+                                                  )
                                                 )
-                                      )
+                               )
                         )
                )
     )
@@ -350,6 +355,69 @@ server <- function(input, output) {
     })
     
     #-------------- EDA ----------------------------
+    
+    ## ------ EDA Box Map ------------------
+    boxbreaks <- function(v,mult=1.5) {
+      qv <- unname(quantile(v,na.rm = TRUE))
+      iqr <- qv[4] - qv[2]
+      upfence <- qv[4] + mult * iqr
+      lofence <- qv[2] - mult * iqr
+      # initialize break points vector
+      bb <- vector(mode="numeric"
+                   ,length=7)
+      # logic for lower and upper fences
+      if (lofence < qv[1]) { # no lower outliers
+        bb[1] <- lofence
+        bb[2] <- floor(qv[1])
+      } else {
+        bb[2] <- lofence
+        bb[1] <- qv[1]
+      }
+      if (upfence > qv[5]) { # no upper outliers
+        bb[7] <- upfence
+        bb[6] <- ceiling(qv[5])
+      } else {
+        bb[6] <- upfence
+        bb[7] <- qv[5]
+      }
+      bb[3:5] <- qv[2:4]
+      return(bb)
+    }
+      
+      get.var <- function(vname,df) {
+        v <- df[vname] %>% st_set_geometry(NULL)
+        v <- unname(v[,1])
+        return(v)
+      }
+      
+      boxmap <- function(vnam, df, legtitle=NA, mtitle="Box Map", mult=1.5){
+        var <- get.var(vnam,df)
+        bb <- boxbreaks(var)
+        tm_shape(df) +
+          tm_fill(vnam,title=legtitle,breaks=bb,palette="-RdBu",
+                  labels = c("lower outlier",
+                             "< 25%",
+                             "25% - 50%",
+                             "50% - 75%",
+                             "> 75%",
+                             "upper outlier")) +
+        tm_borders(alpha=0.5) +
+          tm_layout(title = mtitle, title.position = c("right", "bottom"))
+      }
+      
+      output$boxMapOutput <- renderPlot({
+        # initialize hash
+        industry = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+        # assign values to keys
+        keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+        value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
+        
+        assign_hash(keys, value, industry)
+        
+        boxmap(get_hash(input$EdaIndustryBoxMap, industry), planning_area_3414) 
+      })
+      
+    ## ------ EDA Histogram ----------------
     # vectorize assign, get and exists for convenience
     assign_hash <- Vectorize(assign, vectorize.args = c("x", "value"))
     get_hash <- Vectorize(get, vectorize.args = "x")
@@ -363,8 +431,8 @@ server <- function(input, output) {
         # initialize hash
         abCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
         # assign values to keys
-        keys <- c(unique(ssic2020$primary_ssic_code))
-        value <- paste("Category", unique(ssic2020$category), sep="")
+        keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+        value <- paste("Category", unique(ssic2020_filtered$category), sep="")
         
         assign_hash(keys, value, abCategory)
         
@@ -381,8 +449,8 @@ server <- function(input, output) {
         # initialize hash
         LQCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
         # assign values to keys
-        keys <- c(unique(ssic2020$primary_ssic_code))
-        value <- paste("Cat", unique(ssic2020$category), "Prop", sep="")
+        keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+        value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
         
         assign_hash(keys, value, LQCategory)
         
@@ -394,13 +462,13 @@ server <- function(input, output) {
       }
     })      
     
-
+    ## ------ EDA Clustering ----------------
     output$edaCorrPlot <- renderPlot({
       # initialize hash
       LQCategory = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
       # assign values to keys
-      keys <- c(unique(ssic2020$primary_ssic_code))
-      value <- paste("Cat", unique(ssic2020$category), "Prop", sep="")
+      keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+      value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
       
       assign_hash(keys, value, LQCategory)
       
@@ -419,7 +487,6 @@ server <- function(input, output) {
     
     
     #-----------Clustering -------------------------------------------
-    
     output$clusterDendrogram <- renderPlot({
       proxmat <- dist(sg_business, method= input$proximityCal)
       
@@ -480,7 +547,6 @@ server <- function(input, output) {
           tm_fill(col="SP_CLUSTER",
                   title=" Indicator Clusters")+
           tm_borders(alpha=0.5)
-        
         
       }
       tmap_leaflet(cluster_map, in.shiny=TRUE)
