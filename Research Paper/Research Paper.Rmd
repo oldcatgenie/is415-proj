@@ -1,0 +1,74 @@
+---
+title: "LandMarkdown: A Spatial Analysis of Industries in Singapore"
+subtitle: Using Spatial Point Patterns Analysis and Geographic Segmentation with Clustering
+author:
+  - name: CHEONG Wei Herng, Eugene
+    email: "whcheong.2018@sis.smu.edu.sg"
+    affiliation: Singapore Management University
+  - name: CHOY Jing Wei
+    email: "jwchoy.2018@sis.smu.edu.sg"
+    affiliation: Singapore Management University
+  - name: KANG Yi Qi
+    email: "yiqi.kang.2017@sis.smu.edu.sg"
+    affiliation: Singapore Management University
+abstract: |
+  This is the first paragraph.
+  
+  This is the second paragraph.
+bibliography: sigproc.bib
+csl: acm-sig-proceedings.csl
+output: rticles::acm_article
+---
+
+
+
+# Introduction 
+
+
+# Related Work
+
+
+# Methodology
+
+
+# Results
+
+
+# Discussion
+
+
+# Future Work
+
+
+# References
+
+---
+references:
+- id: meier2012
+  title: Professinal Android 4 Application Development
+  author: 
+  - family: Meier
+    given: Reto
+  type: book
+  publisher: John Wiley & Sons, Inc.
+  issued:
+    year: 2012
+    month: 5
+- id: fenner2012a
+  title: One-click science marketing
+  author:
+  - family: Fenner
+    given: Martin
+  container-title: Nature Materials
+  volume: 11
+  URL: 'https://doi.org/10.1038/nmat3283'
+  DOI: 10.1038/nmat3283
+  issue: 4
+  publisher: Nature Publishing Group
+  page: 261-263
+  type: article-journal
+  issued:
+    year: 2012
+    month: 3
+...
+
