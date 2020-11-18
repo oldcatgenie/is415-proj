@@ -26,86 +26,83 @@ ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
 postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
 
 # ---------- Data Preparation --------------------------
-planning_area <- mpsz %>%
-    group_by(PLN_AREA_N) %>%
-    summarise(geometry = st_union(geometry)) %>%
-    ungroup() %>%
-    filter(!(PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
-                               "CENTRAL WATER CATCHMENT",
-                               "CHANGI BAY",
-                               "MARINA SOUTH",
-                               "SIMPANG",
-                               "SOUTHERN ISLANDS",
-                               "STRAITS VIEW",
-                               "TENGAH")))
+mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL") %>%
+  filter(!(PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
+                             "CENTRAL WATER CATCHMENT",
+                             "CHANGI BAY",
+                             "MARINA SOUTH",
+                             "SIMPANG",
+                             "SOUTHERN ISLANDS",
+                             "STRAITS VIEW",
+                             "TENGAH")))
 
 # There are no industries under category U and T, hence it is filtered out
 ssic2020_filtered <- ssic2020 %>%
     filter(!(category %in% c("U", "T")))
 #--------------------- Transforming CRS for spatial data-------------------
-planning_area_3414 <- st_transform(planning_area, 3414)
+mpsz_3414 <- st_transform(mpsz, 3414)
 
 #------------- Converting to Spatial or Spatial Equivalents---------------------
 corp_info_merged_sp <- as(corp_info_merged_sf, "Spatial")
 corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
-planning_area_3414_sp <- as(planning_area_3414, "Spatial")
+mpsz_3414_sp <- as(mpsz_3414, "Spatial")
 
 for (category_id in unique(corp_info_merged$category)) {
     corp_with_category <- corp_info_merged_sf %>%
         filter(category == category_id)
-    planning_area_3414[, paste0("Category", category_id)]<- lengths(st_intersects(planning_area_3414, corp_with_category))
+    mpsz_3414[, paste0("Category", category_id)]<- lengths(st_intersects(mpsz_3414, corp_with_category))
 }
 
-planning_area_3414 <- planning_area_3414 %>%
+mpsz_3414 <- mpsz_3414 %>%
     mutate(Total = rowSums(across("CategoryG":"CategoryO")))
 
-planning_area_3414 <- planning_area_3414 %>%
-    mutate(`CatGProp` = case_when(Total != 0 ~ `CategoryG`/Total * 1000,
+mpsz_3414 <- mpsz_3414 %>%
+    mutate(`CatGProp` = case_when(Total != 0 ~ (CategoryG/Total) / ((sum(CategoryG)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatFProp` = case_when(Total != 0 ~ `CategoryF`/Total * 1000,
+    mutate(`CatFProp` = case_when(Total != 0 ~ (CategoryF/Total) / ((sum(CategoryF)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatHProp` = case_when(Total != 0 ~ `CategoryH`/Total * 1000,
+    mutate(`CatHProp` = case_when(Total != 0 ~ (CategoryH/Total) / ((sum(CategoryH)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatCProp` = case_when(Total != 0 ~ `CategoryC`/Total * 1000,
+    mutate(`CatCProp` = case_when(Total != 0 ~ (CategoryC/Total) / ((sum(CategoryC)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatNProp` = case_when(Total != 0 ~ `CategoryN`/Total * 1000,
+    mutate(`CatNProp` = case_when(Total != 0 ~ (CategoryN/Total) / ((sum(CategoryN)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatIProp` = case_when(Total != 0 ~ `CategoryI`/Total * 1000,
+    mutate(`CatIProp` = case_when(Total != 0 ~ (CategoryI/Total) / ((sum(CategoryI)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatSProp` = case_when(Total != 0 ~ `CategoryS`/Total * 1000,
+    mutate(`CatSProp` = case_when(Total != 0 ~ (CategoryS/Total) / ((sum(CategoryS)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatMProp` = case_when(Total != 0 ~ `CategoryM`/Total * 1000,
+    mutate(`CatMProp` = case_when(Total != 0 ~ (CategoryM/Total) / ((sum(CategoryM)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatQProp` = case_when(Total != 0 ~ `CategoryQ`/Total * 1000,
+    mutate(`CatQProp` = case_when(Total != 0 ~ (CategoryQ/Total) / ((sum(CategoryQ)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatLProp` = case_when(Total != 0 ~ `CategoryL`/Total * 1000,
+    mutate(`CatLProp` = case_when(Total != 0 ~ (CategoryL/Total) / ((sum(CategoryL)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatJProp` = case_when(Total != 0 ~ `CategoryJ`/Total * 1000,
+    mutate(`CatJProp` = case_when(Total != 0 ~ (CategoryJ/Total) / ((sum(CategoryJ)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatRProp` = case_when(Total != 0 ~ `CategoryR`/Total * 1000,
+    mutate(`CatRProp` = case_when(Total != 0 ~ (CategoryR/Total) / ((sum(CategoryR)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatPProp` = case_when(Total != 0 ~ `CategoryP`/Total * 1000,
+    mutate(`CatPProp` = case_when(Total != 0 ~ (CategoryP/Total) / ((sum(CategoryP)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatEProp` = case_when(Total != 0 ~ `CategoryE`/Total * 1000,
+    mutate(`CatEProp` = case_when(Total != 0 ~ (CategoryE/Total) / ((sum(CategoryE)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatKProp` = case_when(Total != 0 ~ `CategoryK`/Total * 1000,
+    mutate(`CatKProp` = case_when(Total != 0 ~ (CategoryK/Total) / ((sum(CategoryK)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatDProp` = case_when(Total != 0 ~ `CategoryD`/Total * 1000,
+    mutate(`CatDProp` = case_when(Total != 0 ~ (CategoryD/Total) / ((sum(CategoryD)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatAProp` = case_when(Total != 0 ~ `CategoryA`/Total * 1000,
+    mutate(`CatAProp` = case_when(Total != 0 ~ (CategoryA/Total) / ((sum(CategoryA)/sum(Total))),
                                     Total == 0 ~ 0)) %>%
-    mutate(`CatOProp` = case_when(Total != 0 ~ `CategoryO`/Total * 1000,
+    mutate(`CatOProp` = case_when(Total != 0 ~ (CategoryO/Total) / ((sum(CategoryO)/sum(Total))),
                                     Total == 0 ~ 0))
 
 # -------For Correlation Analysis --------------------------
-planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
+mpsz_3414_derived <- st_drop_geometry(mpsz_3414)
 
 # -------For Clustering ------------------------------------
-cluster_vars <- planning_area_3414_derived %>%
-  select("PLN_AREA_N", ends_with("Prop"))
+cluster_vars <- mpsz_3414_derived %>%
+  select("SUBZONE_N", ends_with("Prop"))
 
 sg_business <- select(cluster_vars, c(2:19))
-row.names(sg_business) <- cluster_vars$`PLN_AREA_N`
+row.names(sg_business) <- cluster_vars$`SUBZONE_N`
 
 sg_business_mat <- data.matrix(sg_business)
 
@@ -197,29 +194,34 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                             multiple=FALSE,
                                             width="100%"
                                 ),
+                                radioButtons(inputId = "valueTypeBoxMap",
+                                             label = "Select Value Type",
+                                             inline=TRUE,
+                                             choices = list("Absolute Value", "Location Quotient"),
+                                             selected = "Location Quotient"),
                               ),
                               conditionalPanel(
                                 'input.edaTab === "Histogram"',
-                                  fluidRow(
-                                    column(6,
-                                           checkboxInput(inputId="absoluteHist",
-                                                         label="Absolute Value",
-                                                         value=TRUE,
-                                                         width="100%")
-                                    ),
-                                    column(6,
-                                           checkboxInput(inputId="LQHist",
-                                                         label="Location Quotient",
-                                                         value=TRUE,
-                                                         width="100%")
-                                    )
-                                  ),
                                 selectInput(inputId="EdaIndustryHist",
                                             label="Select Industry",
                                             choices=c(unique(ssic2020_filtered$primary_ssic_code)),
                                             selected="AGRICULTURE AND FISHING",
                                             multiple=FALSE,
                                             width="100%"
+                                ),
+                                fluidRow(
+                                  column(6,
+                                         checkboxInput(inputId="absoluteHist",
+                                                       label="Absolute Value",
+                                                       value=TRUE,
+                                                       width="100%")
+                                  ),
+                                  column(6,
+                                         checkboxInput(inputId="LQHist",
+                                                       label="Location Quotient",
+                                                       value=TRUE,
+                                                       width="100%")
+                                  )
                                 ),
                               ),
                               conditionalPanel(
@@ -241,7 +243,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                        tabsetPanel(
                                          id = "edaTab",
                                          tabPanel("Box Map", br(),
-                                                  plotOutput(outputId="boxMapOutput", width = "800px", height="600px", inline = FALSE)
+                                                  leafletOutput(outputId="boxMapOutput", width="800px", height="800px")
                                                   ),
                                          tabPanel("Histogram", br(),
                                                   conditionalPanel(
@@ -304,7 +306,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                    ),
                                                    sliderInput("Clusters",
                                                                "Number of Clusters:",
-                                                               min = 1,
+                                                               min = 2,
                                                                max = 10,
                                                                value = 5),
                                                    radioButtons(inputId = "clusteringMethod",
@@ -393,8 +395,9 @@ server <- function(input, output) {
       boxmap <- function(vnam, df, legtitle=NA, mtitle="Box Map", mult=1.5){
         var <- get.var(vnam,df)
         bb <- boxbreaks(var)
+        
         tm_shape(df) +
-          tm_fill(vnam,title=legtitle,breaks=bb,palette="-RdBu",
+          tm_fill(vnam,title=legtitle,breaks=bb,palette="-RdBu", id="SUBZONE_N",
                   labels = c("lower outlier",
                              "< 25%",
                              "25% - 50%",
@@ -405,16 +408,27 @@ server <- function(input, output) {
           tm_layout(title = mtitle, title.position = c("right", "bottom"))
       }
       
-      output$boxMapOutput <- renderPlot({
+      output$boxMapOutput <- renderLeaflet({
         # initialize hash
         industry = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
-        # assign values to keys
-        keys <- c(unique(ssic2020_filtered$primary_ssic_code))
-        value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
         
-        assign_hash(keys, value, industry)
-        
-        boxmap(get_hash(input$EdaIndustryBoxMap, industry), planning_area_3414) 
+        if(input$valueTypeBoxMap == 'Location Quotient'){
+          # assign values to keys
+          keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+          value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
+          
+          assign_hash(keys, value, industry)
+          
+          tmap_leaflet(boxmap(get_hash(input$EdaIndustryBoxMap, industry), mpsz_3414) , in.shiny=TRUE)
+        } else {
+          # assign values to keys
+          keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+          value <- paste("Category", unique(ssic2020_filtered$category), sep="")
+          
+          assign_hash(keys, value, industry)
+          
+          tmap_leaflet(boxmap(get_hash(input$EdaIndustryBoxMap, industry), mpsz_3414) , in.shiny=TRUE)
+        }
       })
       
     ## ------ EDA Histogram ----------------
@@ -437,7 +451,7 @@ server <- function(input, output) {
         assign_hash(keys, value, abCategory)
         
         output$edaOutput1 <- renderPlotly({
-          ggplotly(ggplot(data=planning_area_3414, aes_string(x= get_hash(input$EdaIndustryHist, abCategory))) + 
+          ggplotly(ggplot(data=mpsz_3414, aes_string(x= get_hash(input$EdaIndustryHist, abCategory))) + 
                      geom_histogram(bins = 20) + xlab(input$EdaIndustryHist) + ggtitle("Absolute Value"))
           
         })
@@ -455,7 +469,7 @@ server <- function(input, output) {
         assign_hash(keys, value, LQCategory)
         
         output$edaOutput2 <- renderPlotly({
-          ggplotly(ggplot(data=planning_area_3414, aes_string(x= get_hash(input$EdaIndustryHist, LQCategory))) + 
+          ggplotly(ggplot(data=mpsz_3414, aes_string(x= get_hash(input$EdaIndustryHist, LQCategory))) + 
                      geom_histogram(bins = 20) + xlab(input$EdaIndustryHist)  + ggtitle("Location Quotient"))
           
         })
@@ -475,7 +489,7 @@ server <- function(input, output) {
       
       varSelected <- input$ClusterEDAfields
       
-      cluster_vars.cor = cor(planning_area_3414_derived[, get_hash(c(varSelected), LQCategory)])
+      cluster_vars.cor = cor(mpsz_3414_derived[, get_hash(c(varSelected), LQCategory)])
       
       corrplot.mixed(cluster_vars.cor,
                      lower = "ellipse", 
@@ -519,19 +533,20 @@ server <- function(input, output) {
       
       groups <- as.factor(cutree(hclust_ward, k=input$Clusters))
       
-      sg_biz_cluster <- cbind(planning_area_3414, as.matrix(groups)) %>%
+      sg_biz_cluster <- cbind(mpsz_3414, as.matrix(groups)) %>%
         rename(`CLUSTER`=`as.matrix.groups.`)
       
       if(input$clusteringMethod == "Hierarchical"){
         cluster_map <- tm_shape(sg_biz_cluster)+
-          tm_fill(col="CLUSTER",
+          tm_fill(col="CLUSTER", id="SUBZONE_N",
                   title=" Indicator Clusters")+
           tm_borders(alpha=0.5)
       }
       
       if (input$clusteringMethod == "Skater") {
         # -----SKATER -----
-        sg.nb <- poly2nb(planning_area_3414_sp)
+        mpsz_3414_sp <- mpsz_3414_sp[!mpsz_3414$SUBZONE_N %in% c("SUDONG", "SEMAKAU"),]
+        sg.nb <- poly2nb(mpsz_3414_sp)
         lcosts <- nbcosts(sg.nb, sg_business)
         sg.w <- nb2listw(sg.nb, lcosts, style="B")
         sg.mst <- mstree(sg.w)
@@ -540,11 +555,13 @@ server <- function(input, output) {
         
         clustergrps <- skaterclust$groups
         groups_mat <- as.matrix(skaterclust$groups)
+        sg_biz_cluster <- sg_biz_cluster %>%
+          filter(!SUBZONE_N %in% c("SUDONG", "SEMAKAU"))
         sg_biz_spatialcluster <- cbind(sg_biz_cluster, as.factor(groups_mat)) %>%
           rename(`SP_CLUSTER`=`as.factor.groups_mat.`)
         
         cluster_map <- tm_shape(sg_biz_spatialcluster)+
-          tm_fill(col="SP_CLUSTER",
+          tm_fill(col="SP_CLUSTER", id="SUBZONE_N",
                   title=" Indicator Clusters")+
           tm_borders(alpha=0.5)
         
