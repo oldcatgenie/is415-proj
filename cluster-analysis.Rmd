@@ -37,11 +37,7 @@ corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
 corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
 ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
 postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
-mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL")
-planning_area <- mpsz %>%
-  group_by(PLN_AREA_N) %>%
-  summarise(geometry = st_union(geometry)) %>%
-  ungroup() %>%
+mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL") %>%
   filter(!(PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
                              "CENTRAL WATER CATCHMENT",
                              "CHANGI BAY",
@@ -53,18 +49,18 @@ planning_area <- mpsz %>%
 ```
 ### Checking the CRS for Spatial Data
 ```{r}
-planning_area
+mpsz
 ```
 
 ```{r}
-st_crs(planning_area)
+st_crs(mpsz)
 ```
 
 ### Transforming the CRS for Spatial Data
 
 ```{r}
-planning_area_3414 <- st_transform(planning_area, 3414)
-st_crs(planning_area_3414)
+mpsz_3414 <- st_transform(mpsz, 3414)
+st_crs(mpsz_3414)
 ```
 
 ### Converting to Spatial or Spatial* Equivalents
@@ -78,11 +74,11 @@ corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
 ```
 
 ```{r}
-planning_area_sp <- as(planning_area_3414, "Spatial")
+mpsz_sp <- as(mpsz_3414, "Spatial")
 ```
 
 ```{r}
-plot(planning_area_sp, border="darkgrey")+
+plot(mpsz_sp, border="darkgrey") +
 plot(corp_info_merged_sp, add=TRUE)
 ```
 
@@ -94,21 +90,21 @@ unique(corp_info_merged$category)
 for (category_id in unique(corp_info_merged$category)) {
   corp_with_category <- corp_info_merged %>%
     filter(category == category_id)
-  planning_area_3414[, paste0("Category ", category_id)]<- lengths(st_intersects(planning_area_3414, corp_with_category))
+  mpsz_3414[, paste0("Category ", category_id)]<- lengths(st_intersects(mpsz_3414, corp_with_category))
 }
 ```
 
 ```{r}
-planning_area_3414 <- planning_area_3414 %>%
+mpsz_3414 <- mpsz_3414 %>%
   mutate(Total = rowSums(across("Category G":"Category O")))
 ```
 
 ```{r}
-print(mean(planning_area_3414$Total))
+print(mean(mpsz_3414$Total))
 ```
 
 ```{r}
-planning_area_3414 <- planning_area_3414 %>%
+mpsz_3414 <- mpsz_3414 %>%
   mutate(`Cat G Prop` = case_when(Total != 0 ~ `Category G`/Total * 1000,
                                              Total == 0 ~ 0)) %>%
   mutate(`Cat F Prop` = case_when(Total != 0 ~ `Category F`/Total * 1000,
@@ -153,57 +149,57 @@ planning_area_3414 <- planning_area_3414 %>%
 ### Visualisation of Statistics
 
 ```{r}
-ggplot(data=planning_area_3414, aes(x=`Category M`)) +
+ggplot(data=mpsz_3414, aes(x=`Category M`)) +
   geom_histogram(bins=20, color="black", fill="light blue")
 ```
 
 ```{r}
-ggplot(data=planning_area_3414, aes(x=`Category M`)) +
+ggplot(data=mpsz_3414, aes(x=`Category M`)) +
   geom_boxplot(color="black", fill="light blue")
 ```
 
 ```{r}
-ggplot(data=planning_area_3414, aes(x=`Cat M Prop`)) +
+ggplot(data=mpsz_3414, aes(x=`Cat M Prop`)) +
   geom_histogram(bins=20, color="black", fill="light blue")
 ```
 
 ```{r}
-ggplot(data=planning_area_3414, aes(x=`Cat M Prop`)) +
+ggplot(data=mpsz_3414, aes(x=`Cat M Prop`)) +
   geom_boxplot(color="black", fill="light blue")
 ```
 
 ```{r}
-cat_g <- ggplot(data=planning_area_3414, 
+cat_g <- ggplot(data=mpsz_3414, 
              aes(x= `Cat G Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_f <- ggplot(data=planning_area_3414, 
+cat_f <- ggplot(data=mpsz_3414, 
              aes(x= `Cat F Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_h <- ggplot(data=planning_area_3414, 
+cat_h <- ggplot(data=mpsz_3414, 
              aes(x= `Cat H Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_c <- ggplot(data=planning_area_3414, 
+cat_c <- ggplot(data=mpsz_3414, 
              aes(x= `Cat C Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_n <- ggplot(data=planning_area_3414, 
+cat_n <- ggplot(data=mpsz_3414, 
              aes(x= `Cat N Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_i <- ggplot(data=planning_area_3414, 
+cat_i <- ggplot(data=mpsz_3414, 
              aes(x= `Cat I Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
@@ -217,37 +213,37 @@ ggarrange(cat_g, cat_f, cat_h, cat_c, cat_n, cat_i,
 ```
 
 ```{r}
-cat_s <- ggplot(data=planning_area_3414, 
+cat_s <- ggplot(data=mpsz_3414, 
              aes(x= `Cat S Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_m <- ggplot(data=planning_area_3414, 
+cat_m <- ggplot(data=mpsz_3414, 
              aes(x= `Cat M Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_q <- ggplot(data=planning_area_3414, 
+cat_q <- ggplot(data=mpsz_3414, 
              aes(x= `Cat Q Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_l <- ggplot(data=planning_area_3414, 
+cat_l <- ggplot(data=mpsz_3414, 
              aes(x= `Cat L Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_j <- ggplot(data=planning_area_3414, 
+cat_j <- ggplot(data=mpsz_3414, 
              aes(x= `Cat J Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_r <- ggplot(data=planning_area_3414, 
+cat_r <- ggplot(data=mpsz_3414, 
              aes(x= `Cat R Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
@@ -261,37 +257,37 @@ ggarrange(cat_s, cat_m, cat_q, cat_l, cat_j, cat_r,
 ```
 
 ```{r}
-cat_p <- ggplot(data=planning_area_3414, 
+cat_p <- ggplot(data=mpsz_3414, 
              aes(x= `Cat P Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_e <- ggplot(data=planning_area_3414, 
+cat_e <- ggplot(data=mpsz_3414, 
              aes(x= `Cat E Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_k <- ggplot(data=planning_area_3414, 
+cat_k <- ggplot(data=mpsz_3414, 
              aes(x= `Cat K Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_d <- ggplot(data=planning_area_3414, 
+cat_d <- ggplot(data=mpsz_3414, 
              aes(x= `Cat D Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_a <- ggplot(data=planning_area_3414, 
+cat_a <- ggplot(data=mpsz_3414, 
              aes(x= `Cat A Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
-cat_o <- ggplot(data=planning_area_3414, 
+cat_o <- ggplot(data=mpsz_3414, 
              aes(x= `Cat O Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
@@ -307,21 +303,26 @@ ggarrange(cat_p, cat_e, cat_k, cat_d, cat_a, cat_o,
 ### Choropleths
 
 ```{r}
-qtm(planning_area_3414, "Cat H Prop")
+qtm(mpsz_3414, "Cat H Prop")
 ```
 
 ```{r}
-qtm(planning_area_3414, "Total")
+qtm(mpsz_3414, "Total")
 ```
 
 ### Correlation Analysis
 
 ```{r}
-planning_area_3414_derived <- st_drop_geometry(planning_area_3414)
+mpsz_3414_derived <- st_drop_geometry(mpsz_3414)
 ```
 
 ```{r}
-cluster_vars.cor = cor(planning_area_3414_derived[, 21:38])
+clustering_data <- mpsz_3414_derived[,16:33] %>%
+  select(-`Category I`, -`Category L`, -`Category H`, -`Category P`, -`Category N`, -`Category J`, -`Category M`, -`Category F`)
+```
+
+```{r}
+cluster_vars.cor = cor(clustering_data)
 corrplot.mixed(cluster_vars.cor,
          lower = "ellipse", 
                upper = "number",
@@ -333,19 +334,19 @@ corrplot.mixed(cluster_vars.cor,
 ## Extracting Clustering Variables
 
 ```{r}
-cluster_vars <- planning_area_3414_derived %>%
-  select("PLN_AREA_N", ends_with("Prop"))
+cluster_vars <- mpsz_3414_derived %>%
+  select("SUBZONE_N", ends_with("Prop"), -`Cat I Prop`, -`Cat L Prop`, -`Cat H Prop`, -`Cat P Prop`, -`Cat N Prop`, -`Cat J Prop`, -`Cat M Prop`, -`Cat F Prop`)
 head(cluster_vars,10)
 ```
 
 ```{r}
-row.names(cluster_vars) <- cluster_vars$`PLN_AREA_N`
+row.names(cluster_vars) <- cluster_vars$`SUBZONE_N`
 head(cluster_vars,10)
 ```
 
 ```{r}
-sg_business <- select(cluster_vars, c(2:19))
-row.names(sg_business) <- cluster_vars$`PLN_AREA_N`
+sg_business <- select(cluster_vars, c(2:11))
+row.names(sg_business) <- cluster_vars$`SUBZONE_N`
 head(sg_business, 10)
 ```
 
@@ -365,15 +366,15 @@ summary(sg_business.zscore)
 
 ### Visualising the standardised clustering variables
 ```{r}
-r <- ggplot(data=planning_area_3414_derived, 
-             aes(x= `Cat M Prop`)) +
+r <- ggplot(data=mpsz_3414_derived, 
+             aes(x= `Cat G Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue")
 
 sg_business_minmax_df <- as.data.frame(sg_business.minmax)
 s <- ggplot(data=sg_business_minmax_df, 
-       aes(x=`Cat M Prop`)) +
+       aes(x=`Cat G Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue") +
@@ -381,7 +382,7 @@ s <- ggplot(data=sg_business_minmax_df,
 
 sg_business_zscore_df <- as.data.frame(sg_business.zscore)
 z <- ggplot(data=sg_business_zscore_df, 
-       aes(x=`Cat M Prop`)) +
+       aes(x=`Cat G Prop`)) +
   geom_histogram(bins=20, 
                  color="black", 
                  fill="light blue") +
@@ -429,7 +430,7 @@ With reference to the output above, we can see that Ward’s method provides the
 
 ```{r}
 set.seed(54321)
-gap_stat <- clusGap(sg_business, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+gap_stat <- clusGap(sg_business, FUN = hcut, nstart = 25, K.max = 25, B = 50)
 # Print the result
 print(gap_stat, method = "firstmax")
 ```
@@ -475,7 +476,7 @@ groups <- as.factor(cutree(hclust_ward, k=10))
 ```
 
 ```{r}
-sg_biz_cluster <- cbind(planning_area_3414, as.matrix(groups)) %>%
+sg_biz_cluster <- cbind(mpsz_3414, as.matrix(groups)) %>%
   rename(`CLUSTER`=`as.matrix.groups.`)
 ```
 
@@ -488,19 +489,33 @@ qtm(sg_biz_cluster, "CLUSTER")
 ### Conversion to SpatialPolygonsDataFrame
 
 ```{r}
-planning_area_3414_sp <- as_Spatial(planning_area_3414)
+mpsz_3414_sp <- as_Spatial(mpsz_3414)
 ```
 
 ### Computing Neighbour List
 
 ```{r}
-sg.nb <- poly2nb(planning_area_3414_sp)
+sg.nb <- poly2nb(mpsz_3414_sp)
 summary(sg.nb)
 ```
 
 ```{r}
-plot(planning_area_3414_sp, border=grey(.5))
-plot(sg.nb, coordinates(planning_area_3414_sp), col="blue", add=TRUE)
+mpsz_3414_sp$SUBZONE_N[16]
+mpsz_3414_sp$SUBZONE_N[17]
+```
+
+```{r}
+mpsz_3414_sp <- mpsz_3414_sp[!mpsz_3414$SUBZONE_N %in% c("SUDONG", "SEMAKAU"),]
+```
+
+```{r}
+sg.nb <- poly2nb(mpsz_3414_sp)
+summary(sg.nb)
+```
+
+```{r}
+plot(mpsz_3414_sp, border=grey(.5))
+plot(sg.nb, coordinates(mpsz_3414_sp), col="blue", add=TRUE)
 ```
 
 ### Computing Minimum Spanning Tree
@@ -535,8 +550,8 @@ head(sg.mst)
 ```
 
 ```{r}
-plot(planning_area_sp, border=gray(.5))
-plot.mst(sg.mst, coordinates(planning_area_sp), 
+plot(mpsz_sp, border=gray(.5))
+plot.mst(sg.mst, coordinates(mpsz_sp), 
      col="blue", cex.lab=0.7, cex.circles=0.005, add=TRUE)
 ```
 
@@ -554,13 +569,15 @@ table(clustergrps)
 ```
 
 ```{r}
-plot(planning_area_sp, border=gray(.5))
-plot(skaterclust, coordinates(planning_area_3414_sp), cex.lab=.7,
+plot(mpsz_sp, border=gray(.5))
+plot(skaterclust, coordinates(mpsz_3414_sp), cex.lab=.7,
      groups.colors=c("red","green","blue", "brown", "pink"), cex.circles=0.005, add=TRUE)
 ```
 
 ```{r}
 groups_mat <- as.matrix(skaterclust$groups)
+sg_biz_cluster <- sg_biz_cluster %>%
+  filter(!SUBZONE_N %in% c("SUDONG", "SEMAKAU"))
 sg_biz_spatialcluster <- cbind(sg_biz_cluster, as.factor(groups_mat)) %>%
   rename(`SP_CLUSTER`=`as.factor.groups_mat.`)
 qtm(sg_biz_spatialcluster, "SP_CLUSTER")
