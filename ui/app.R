@@ -9,7 +9,7 @@
 
 
 #----- Importing Packages ---------
-packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinyWidgets', 'DT', 'leaflet', 'datastructures')
+packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinycssloaders', 'shinyWidgets', 'DT', 'leaflet', 'datastructures')
 for (p in packages){
     if(!require(p, character.only = T)){
         install.packages(p)
@@ -24,7 +24,6 @@ corp_info_merged_sf <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'
 ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
 
 postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
-
 # ---------- Data Preparation --------------------------
 mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL") %>%
   filter(!(PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
@@ -45,6 +44,9 @@ mpsz_3414 <- st_transform(mpsz, 3414)
 #------------- Converting to Spatial or Spatial Equivalents---------------------
 corp_info_merged_sp <- as(corp_info_merged_sf, "Spatial")
 corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
+corp_info_merged_ppp <- as(corp_info_merged_sp, "ppp")
+corp_info_merged_ppp_jit <- rjitter(corp_info_merged_ppp, retry=TRUE, nsim=1, drop=TRUE)
+
 mpsz_3414_sp <- as(mpsz_3414, "Spatial")
 
 for (category_id in unique(corp_info_merged$category)) {
@@ -97,6 +99,19 @@ mpsz_3414 <- mpsz_3414 %>%
 # -------For Correlation Analysis --------------------------
 mpsz_3414_derived <- st_drop_geometry(mpsz_3414)
 
+# ------ For SPP -------------------------------------------
+## Creating Owin
+mpsz_owin <- as(mpsz_3414_sp, "owin")
+corp_info_merged_ppp = corp_info_merged_ppp_jit[mpsz_owin]
+
+sg <- mpsz_3414_sp[!(mpsz_3414_sp@data$PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
+                                                         "CENTRAL WATER CATCHMENT",
+                                                         "CHANGI BAY",
+                                                         "MARINA SOUTH",
+                                                         "SIMPANG",
+                                                         "SOUTHERN ISLANDS",
+                                                         "STRAITS VIEW",
+                                                         "TENGAH")),]
 # -------For Clustering ------------------------------------
 cluster_vars <- mpsz_3414_derived %>%
   select("SUBZONE_N", ends_with("Prop"))
@@ -250,15 +265,15 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                     'input.absoluteHist',
                                                       column(6,
                                                            plotlyOutput(outputId="edaOutput1", width = "100%", height = "400px", inline = FALSE)
-                                                      )
+                                                      ),
                                                     ),
                                                   conditionalPanel(
                                                     'input.LQHist',
                                                     column(6,
                                                            plotlyOutput(outputId="edaOutput2", width = "100%", height = "400px", inline = FALSE)
                                                     )
-                                                  )
-                                        ),
+                                                )
+                                          ),
                                          tabPanel("Correlation Analysis",
                                                   plotOutput("edaCorrPlot",
                                                              width="800px",
@@ -271,19 +286,48 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                ),
                # ----- SPP Panel -------------------
                tabPanel("SPP", value="spp", fluid=TRUE, icon=icon("map-marker-alt"),
-                        # Sidebar with a slider input for number of bins 
                         sidebarLayout(fluid=TRUE,
-                                      sidebarPanel(
-                                          sliderInput("bins",
-                                                      "Number of bins:",
-                                                      min = 1,
-                                                      max = 50,
-                                                      value = 30)
+                                      sidebarPanel(fluid=TRUE, width=3,
+                                        selectInput(inputId="sppRegion",
+                                                    label="Region",
+                                                    choices=c("ALL", "NORTH", "NORTH-EAST", "CENTRAL", "WEST", "EAST"),
+                                                    selected="ALL",
+                                                    multiple=FALSE,
+                                                    width="100%"
+                                        ),
+                                        conditionalPanel(
+                                          'input.sppTab === "Kernel Density"',
+                                            checkboxInput(inputId="kernelType",
+                                                      label="Spatial Grid Data Frame",
+                                                      value=FALSE,
+                                                      width="100%")
+                                        ),
+                                        conditionalPanel(
+                                          'input.sppTab === "Raster"',
+                                          sliderInput(inputId="rasterOpacity",
+                                                        label="Opacity",
+                                                      min = 0,
+                                                      max = 100,
+                                                      value = 50)
+                                        )
+                                
                                       ),
                                       
                                       # Kernel Density Map
                                       mainPanel(
-                                      )
+                                        tabsetPanel(
+                                          id = "sppTab",
+                                          tabPanel("Kernel Density", br(),
+                                                   withSpinner(plotOutput(outputId="kernelOutput", width="1000px", height="700px"))
+                                          ),
+                                          tabPanel("Owin", br(),
+                                                   withSpinner(plotOutput(outputId="owinOutput", width="1000px", height="700px"))
+                                          ),
+                                          tabPanel("Raster", br(),
+                                                   withSpinner(leafletOutput(outputId="rasterOutput", width="1000px", height="700px"))
+                                          )
+                                        )
+                                    )
                         )
                ),
                # ----- Clustering Panel -------------------
@@ -314,17 +358,23 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                                 inline=TRUE,
                                                                 choices = list("Hierarchical", "Skater"),
                                                                 selected = "Hierarchical"),
+                          
+                                                   checkboxInput(inputId="gapStats",
+                                                                 label="Show Cluster Size Suggestion",
+                                                                 value=FALSE,
+                                                                 width="100%"),
+                                                   plotOutput("gapStatsResult")
                                       ),
                                       
                                       # Show Clustering Plots
                                       mainPanel(fluid=TRUE, width=9,
                                                 fluidRow(
-                                                  column(6, leafletOutput("clusteringPlot")),
-                                                  column(6, plotOutput("clusterDendrogram"))
+                                                  column(6, withSpinner(leafletOutput("clusteringPlot"))),
+                                                  column(6, withSpinner(plotOutput("clusterDendrogram")))
                                                 ),
                                                 conditionalPanel("input.agglomerationMethod != 'median' & input.agglomerationMethod != 'centroid'",
                                                 fluidRow(
-                                                    column(6, plotlyOutput("geographicSeg"))
+                                                    column(6, withSpinner(plotlyOutput("geographicSeg")))
                                                   )
                                                 )
                                )
@@ -499,8 +549,103 @@ server <- function(input, output) {
                      tl.col = "black")
     })
     
+    #----------- SPP--------------------------------------------------
+    observe({
+      if(input$sppRegion == "ALL") {
+        sg_owin <- as(sg, "owin")
+        sg_ppp <- corp_info_merged_ppp_jit[sg_owin]
+        sg_ppp_bw <- density(sg_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+        gridded_sg_bw <- as.SpatialGridDataFrame.im(sg_ppp_bw)
+        if(input$kernelType){
+          output$kernelOutput <- renderPlot({
+            plot(gridded_sg_bw, main="ALL REGION")
+          })
+        } else {
+          output$kernelOutput <- renderPlot({
+            plot(sg_ppp_bw, main="ALL REGION")
+          })
+        }
+        
+        output$owinOutput <- renderPlot({
+          plot(sg_ppp, main="ALL REGION")
+          })
+        
+        output$rasterOutput<- renderLeaflet({
+          kde_sg_bw_raster <- raster(gridded_sg_bw)
+          projection(kde_sg_bw_raster) <- CRS("+init=EPSG:3414")
+          
+          rasterMap <-tm_shape(mpsz_3414)+
+            tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
+            tm_shape(kde_sg_bw_raster) + 
+            tm_raster("v", alpha=input$rasterOpacity/100,  
+                      palette = "YlOrRd") +
+            tm_layout(legend.position = c("right", "bottom"), frame = FALSE) +
+            tmap_options(basemaps = c('OpenStreetMap'))
+          
+          
+          tmap_leaflet(rasterMap, in.shiny=TRUE)
+      
+        })
+      } else {
+        region <- paste(input$sppRegion, "REGION", sep=" ")
+        region_owin <- sg[sg@data$REGION_N == region,]
+        
+        subzone_region <- mpsz_3414 %>% 
+                filter(REGION_N == region)
+        
+        region_owin_sp <- as(subzone_region, "Spatial")
+        region_owin_sp <- as(region_owin_sp, "SpatialPolygons")
+        region_owin <- as(region_owin_sp, "owin")
+        region_ppp = corp_info_merged_ppp_jit[region_owin]
+        
+        region_ppp_bw <- density(region_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+        gridded_region_bw <- as.SpatialGridDataFrame.im(region_ppp_bw)
+        
+        if(input$kernelType){
+          output$kernelOutput <- renderPlot({
+            plot(gridded_region_bw, main=region)
+          })
+        } else {
+          output$kernelOutput <- renderPlot({
+            plot(region_ppp_bw, main=region)
+          })
+        }
+        output$owinOutput <- renderPlot({ 
+          plot(region_ppp, main=region)
+          })
+        
+        output$rasterOutput<- renderLeaflet({
+          kde_region_bw_raster <- raster(gridded_region_bw)
+          projection(kde_region_bw_raster) <- CRS("+init=EPSG:3414")
+          
+          rasterMap <-tm_shape(mpsz_3414)+
+            tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
+            tm_shape(kde_region_bw_raster) + 
+            tm_raster("v", alpha=input$rasterOpacity/100,  
+                      palette = "YlOrRd")
+            tm_layout(legend.position = c("right", "bottom"), frame = FALSE) +
+            tmap_options(basemaps = c('OpenStreetMap'))
+          
+          
+          tmap_leaflet(rasterMap, in.shiny=TRUE)
+        })
+      }
     
+    })
     #-----------Clustering -------------------------------------------
+    #Gap Statistic
+    observe({
+      if(input$gapStats) {
+        output$gapStatsResult <- renderPlot({
+          sg_business.minmax <- normalize(sg_business)
+          set.seed(54321)
+          gap_stat <- clusGap(sg_business, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+          
+          plot(fviz_gap_stat(gap_stat))
+        })
+      }
+    })
+    
     output$clusterDendrogram <- renderPlot({
       proxmat <- dist(sg_business, method= input$proximityCal)
       
@@ -568,6 +713,9 @@ server <- function(input, output) {
       }
       tmap_leaflet(cluster_map, in.shiny=TRUE)
     })
+    
+    
+    
 }
 
 # Run the application 
