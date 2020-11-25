@@ -348,6 +348,13 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                                                multiple=FALSE,
                                                                width="100%"
                                                    ),
+                                                   selectInput(inputId="ClusteringFields",
+                                                                 label="Measure",
+                                                                 choices=c(unique(ssic2020_filtered$primary_ssic_code)),
+                                                                 selected=c(unique(ssic2020_filtered$primary_ssic_code)),
+                                                                 multiple=TRUE,
+                                                                 width="100%"
+                                                   ),
                                                    sliderInput("Clusters",
                                                                "Number of Clusters:",
                                                                min = 2,
@@ -647,7 +654,21 @@ server <- function(input, output) {
     })
     
     output$clusterDendrogram <- renderPlot({
-      proxmat <- dist(sg_business, method= input$proximityCal)
+      vars <- input$ClusteringFields
+      # initialize hash
+      selected_category = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+      # assign values to keys
+      keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+      value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
+      
+      assign_hash(keys, value, selected_category)
+      
+      
+      varSelected <- input$ClusterEDAfields
+      
+      sg_business_df = sg_business[, get_hash(c(vars), selected_category)]
+      
+      proxmat <- dist(sg_business_df, method= input$proximityCal)
       
       hclust_ward <- hclust(proxmat, method= input$agglomerationMethod)
       
@@ -656,6 +677,22 @@ server <- function(input, output) {
     })
     
     output$geographicSeg <- renderPlotly({
+      vars <- input$ClusteringFields
+      # initialize hash
+      selected_category = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+      # assign values to keys
+      keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+      value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
+      
+      assign_hash(keys, value, selected_category)
+      
+      
+      varSelected <- input$ClusterEDAfields
+      
+      sg_business_df = sg_business[, get_hash(c(vars), selected_category)]
+      
+      sg_business_mat <- data.matrix(sg_business_df)
+      
       heatmaply(normalize(sg_business_mat),
                 Colv=NA,
                 dist_method = input$proximityCal,
@@ -673,7 +710,21 @@ server <- function(input, output) {
     })
     
     output$clusteringPlot <- renderLeaflet({
-      proxmat <- dist(sg_business, method= input$proximityCal)
+      vars <- input$ClusteringFields
+      # initialize hash
+      selected_category = new.env(hash = TRUE, parent = emptyenv(), size = 100L)
+      # assign values to keys
+      keys <- c(unique(ssic2020_filtered$primary_ssic_code))
+      value <- paste("Cat", unique(ssic2020_filtered$category), "Prop", sep="")
+      
+      assign_hash(keys, value, selected_category)
+      
+      
+      varSelected <- input$ClusterEDAfields
+      
+      sg_business_df = sg_business[, get_hash(c(vars), selected_category)]
+      
+      proxmat <- dist(sg_business_df, method= input$proximityCal)
       hclust_ward <- hclust(proxmat, method= input$agglomerationMethod)
       
       groups <- as.factor(cutree(hclust_ward, k=input$Clusters))
@@ -692,7 +743,7 @@ server <- function(input, output) {
         # -----SKATER -----
         mpsz_3414_sp <- mpsz_3414_sp[!mpsz_3414$SUBZONE_N %in% c("SUDONG", "SEMAKAU"),]
         sg.nb <- poly2nb(mpsz_3414_sp)
-        lcosts <- nbcosts(sg.nb, sg_business)
+        lcosts <- nbcosts(sg.nb, sg_business_df)
         sg.w <- nb2listw(sg.nb, lcosts, style="B")
         sg.mst <- mstree(sg.w)
         
