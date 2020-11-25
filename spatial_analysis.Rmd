@@ -1,0 +1,368 @@
+---
+title: "spatial_analysis_3"
+author: "Choy Jing Wei"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+packages = c('rgdal', 'maptools','raster','spatstat', 'sf', 'spdep', 'tmap', 'tidyverse','OpenStreetMap','tmaptools')
+for (p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+
+# Import csv files
+
+```{r}
+corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
+ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
+postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
+```
+
+# Join columns
+
+```{r}
+corp_info <- left_join(corp_info,ssic2020,by=c('primary_ssic_code' = "SSIC 2020"))
+names(corp_info)[names(corp_info) == 'primary_ssic_code.y'] <- 'primary_ssic_category_description'
+sum(is.na(corp_info))
+```
+
+# Check if there is missing data
+
+```{r}
+sum(is.na(postal_code_geom))
+```
+
+# Merge postal code with corp info
+
+```{r}
+postal_code_geom$postal_code <- as.character(postal_code_geom$postal_code)
+corp_info <- left_join(corp_info,postal_code_geom,by=c('postal_code' = 'postal_code'))
+```
+
+# Check if there is missing data
+
+```{r}
+sum(is.na(corp_info))
+```
+
+# Remove missing data
+
+```{r}
+corp_info <- na.omit(corp_info)
+```
+
+# Write file for finalised dataset
+
+```{r}
+write_csv(corp_info, "data/aspatial/corp_info_merged.csv")
+```
+
+# Read finalised dataset file
+
+```{r}
+corp_info_merged <- read.csv("data/aspatial/corp_info_merged.csv", header = TRUE)
+```
+
+```{r}
+corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
+```
+
+```{r}
+mpsz_sf <- st_read(dsn = "data/geospatial", layer = "MP14_SUBZONE_WEB_PL")
+```
+
+```{r}
+crs(mpsz_sf)
+```
+
+```{r}
+mpsz_sf_3414 <- st_transform(mpsz_sf, 3414)
+crs(mpsz_sf_3414)
+```
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged, "Spatial")
+```
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
+```
+
+```{r}
+mpsz_3414_sp <- as(mpsz_sf_3414, "Spatial")
+```
+
+```{r}
+plot(mpsz_3414_sp, border="darkgrey")+
+plot(corp_info_merged_sp, add=TRUE)
+```
+
+```{r}
+corp_info_merged_ppp <- as(corp_info_merged_sp, "ppp")
+```
+
+```{r}
+duplicated(corp_info_merged_ppp)
+```
+
+```{r}
+corp_info_merged_ppp_jit <- rjitter(corp_info_merged_ppp, retry=TRUE, nsim=1, drop=TRUE)
+duplicated(corp_info_merged_ppp_jit)
+```
+
+# Creating owin
+
+```{r}
+mpsz_owin <- as(mpsz_3414_sp, "owin")
+```
+
+```{r}
+plot(mpsz_owin)
+```
+
+```{r}
+summary(mpsz_owin)
+```
+
+```{r}
+corp_info_merged_ppp = corp_info_merged_ppp_jit[mpsz_owin]
+```
+
+```{r}
+plot(corp_info_merged_ppp)
+```
+
+```{r}
+sg <- mpsz_3414_sp[!(mpsz_3414_sp@data$PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
+                             "CENTRAL WATER CATCHMENT",
+                             "CHANGI BAY",
+                             "MARINA SOUTH",
+                             "SIMPANG",
+                             "SOUTHERN ISLANDS",
+                             "STRAITS VIEW",
+                             "TENGAH")),]
+```
+
+# Filter by regions
+
+```{r}
+north_region = sg[sg@data$REGION_N == "NORTH REGION",]
+northeast_region = sg[sg@data$REGION_N == "NORTH-EAST REGION",]
+central_region = sg[sg@data$REGION_N == "CENTRAL REGION",]
+west_region = sg[sg@data$REGION_N == "WEST REGION",]
+east_region = sg[sg@data$REGION_N == "EAST REGION",]
+```
+
+```{r}
+unique(mpsz_sf_3414$SUBZONE)
+```
+
+```{r}
+subzone_north_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "NORTH REGION")
+subzone_northeast_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "NORTH-EAST REGION")
+subzone_central_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "CENTRAL REGION")
+subzone_west_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "WEST REGION")
+subzone_east_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "EAST REGION")
+```
+
+```{r}
+list_subzone_north <- list(subzone_north_region$SUBZONE_N)
+list_subzone_north
+```
+
+```{r}
+list_subzone_northeast <- list(subzone_northeast_region$SUBZONE_N)
+list_subzone_central <- list(subzone_central_region$SUBZONE_N)
+list_subzone_west <- list(subzone_west_region$SUBZONE_N)
+list_subzone_east <- list(subzone_east_region$SUBZONE_N)
+```
+
+```{r}
+north_sp <- as(subzone_north_region, "Spatial")
+northeast_sp <- as(subzone_northeast_region, "Spatial")
+central_sp <- as(subzone_central_region, "Spatial")
+west_sp <- as(subzone_west_region, "Spatial")
+east_sp <- as(subzone_east_region, "Spatial")
+```
+
+```{r}
+north_sp <- as(north_sp, "SpatialPolygons")
+northeast_sp <- as(northeast_sp, "SpatialPolygons")
+central_sp <- as(central_sp, "SpatialPolygons")
+west_sp <- as(west_sp, "SpatialPolygons")
+east_sp <- as(east_sp, "SpatialPolygons")
+```
+
+
+# Creating owin
+
+```{r}
+sg_owin <- as(sg, "owin")
+north_owin <- as(north_sp, "owin")
+northeast_owin <- as(northeast_sp, "owin")
+central_owin <- as(central_sp, "owin")
+west_owin <- as(west_sp, "owin")
+east_owin <- as(east_sp, "owin")
+```
+
+```{r}
+plot(sg_owin)
+plot(north_owin)
+plot(northeast_owin)
+plot(central_owin)
+plot(west_owin)
+plot(east_owin)
+```
+
+```{r}
+sg_ppp = corp_info_merged_ppp_jit[sg_owin]
+plot(sg_ppp)
+north_ppp = corp_info_merged_ppp_jit[north_owin]
+plot(north_ppp)
+northeast_ppp = corp_info_merged_ppp_jit[northeast_owin]
+plot(northeast_ppp)
+central_ppp = corp_info_merged_ppp_jit[central_owin]
+plot(central_ppp)
+west_ppp = corp_info_merged_ppp_jit[west_owin]
+plot(west_ppp)
+east_ppp = corp_info_merged_ppp_jit[east_owin]
+plot(east_ppp)
+```
+
+```{r}
+sg_ppp_bw <- density(sg_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+north_ppp_bw <- density(north_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+northeast_ppp_bw <- density(northeast_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+central_ppp_bw <- density(central_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+west_ppp_bw <- density(west_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+east_ppp_bw <- density(east_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+```
+
+```{r}
+sg_ppp_bw.km <- rescale(sg_ppp_bw, 1000, "km")
+north_ppp_bw.km <- rescale(north_ppp_bw, 1000, "km")
+northeast_ppp_bw.km <- rescale(northeast_ppp_bw, 1000, "km")
+central_ppp_bw.km <- rescale(central_ppp_bw, 1000, "km")
+west_ppp_bw.km <- rescale(west_ppp_bw, 1000, "km")
+east_ppp_bw.km <- rescale(east_ppp_bw, 1000, "km")
+```
+
+
+
+```{r}
+plot(sg_ppp_bw.km)
+plot(north_ppp_bw.km)
+plot(northeast_ppp_bw.km)
+plot(central_ppp_bw.km)
+plot(west_ppp_bw.km)
+plot(east_ppp_bw.km)
+```
+
+```{r}
+gridded_sg_bw <- as.SpatialGridDataFrame.im(sg_ppp_bw)
+spplot(gridded_sg_bw)
+
+gridded_north_bw <- as.SpatialGridDataFrame.im(north_ppp_bw)
+spplot(gridded_north_bw)
+
+gridded_northeast_bw <- as.SpatialGridDataFrame.im(northeast_ppp_bw)
+spplot(gridded_northeast_bw)
+
+gridded_central_bw <- as.SpatialGridDataFrame.im(central_ppp_bw)
+spplot(gridded_central_bw)
+
+gridded_west_bw <- as.SpatialGridDataFrame.im(west_ppp_bw)
+spplot(gridded_west_bw)
+
+gridded_east_bw <- as.SpatialGridDataFrame.im(east_ppp_bw)
+spplot(gridded_east_bw)
+```
+
+```{r}
+kde_sg_bw_raster <- raster(gridded_sg_bw)
+kde_north_bw_raster <- raster(gridded_north_bw)
+kde_northeast_bw_raster <- raster(gridded_northeast_bw)
+kde_central_bw_raster <- raster(gridded_central_bw)
+kde_west_bw_raster <- raster(gridded_west_bw)
+kde_east_bw_raster <- raster(gridded_east_bw)
+```
+
+```{r}
+projection(kde_sg_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_north_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_northeast_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_central_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_west_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_east_bw_raster) <- CRS("+init=EPSG:3414")
+```
+
+```{r}
+tmap_mode("view")
+```
+
+```{r}
+tm_shape(kde_sg_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+```{r}
+tm_shape(kde_north_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+```{r}
+tm_shape(kde_northeast_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+```{r}
+tm_shape(kde_central_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+```{r}
+tm_shape(kde_west_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+```{r}
+tm_shape(kde_east_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+```{r}
+tm_shape(kde_northeast_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
