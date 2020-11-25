@@ -1,0 +1,13 @@
+name: application
+title: application
+username:
+account: landmarkdown
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3301444
+bundleId: 3905471
+url: https://landmarkdown.shinyapps.io/application/
+when: 1606323446.20038
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Rplot001.jpg|www/custom.css|www/Landmarkdown_logo.png

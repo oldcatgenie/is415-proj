@@ -8,14 +8,30 @@
 #
 
 
-#----- Importing Packages ---------
-packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse', 'shiny', 'shinythemes', 'shinycssloaders', 'shinyWidgets', 'DT', 'leaflet', 'datastructures')
-for (p in packages){
-    if(!require(p, character.only = T)){
-        install.packages(p)
-    }
-    library(p,character.only = T)
-}
+#----- Loading Packages. Note: installing packages does not work for shinyapps  ---------
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggpubr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(heatmaply)
+library(corrplot)
+library(psych)
+library(tidyverse)
+library(shiny)
+library(shinythemes)
+library(shinycssloaders)
+library(shinyWidgets)
+library(DT)
+library(leaflet)
+library(datastructures)
+library(maptools)
+library(tmaptools)
+library(raster)
+library(spatstat)
+library(OpenStreetMap)
 
 #-----Importing Aspatial and Spatial Data ------------
 corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
@@ -114,9 +130,9 @@ sg <- mpsz_3414_sp[!(mpsz_3414_sp@data$PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS"
                                                          "TENGAH")),]
 # -------For Clustering ------------------------------------
 cluster_vars <- mpsz_3414_derived %>%
-  select("SUBZONE_N", ends_with("Prop"))
+  dplyr::select("SUBZONE_N", ends_with("Prop"))
 
-sg_business <- select(cluster_vars, c(2:19))
+sg_business <- dplyr::select(cluster_vars, c(2:19))
 row.names(sg_business) <- cluster_vars$`SUBZONE_N`
 
 sg_business_mat <- data.matrix(sg_business)
@@ -258,7 +274,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                        tabsetPanel(
                                          id = "edaTab",
                                          tabPanel("Box Map", br(),
-                                                  leafletOutput(outputId="boxMapOutput", width="800px", height="800px")
+                                                  leafletOutput(outputId="boxMapOutput", width="1000px", height="600px")
                                                   ),
                                          tabPanel("Histogram", br(),
                                                   conditionalPanel(
@@ -306,7 +322,7 @@ ui <- fluidPage(theme=shinytheme("darkly"),
                                           'input.sppTab === "Raster"',
                                           sliderInput(inputId="rasterOpacity",
                                                         label="Opacity",
-                                                      min = 0,
+                                                      min = 1,
                                                       max = 100,
                                                       value = 50)
                                         )
@@ -578,15 +594,16 @@ server <- function(input, output) {
           })
         
         output$rasterOutput<- renderLeaflet({
+          proj4string(gridded_sg_bw) <- "+proj=tmerc +lat_0=1.366666666666667 +lon_0=103.8333333333333 +k=1 +x_0=28001.642 +y_0=38744.572 +ellps=WGS84 +units=m +no_defs 
+"
           kde_sg_bw_raster <- raster(gridded_sg_bw)
-          projection(kde_sg_bw_raster) <- CRS("+init=EPSG:3414")
+          #projection(kde_sg_bw_raster) = CRS("+init=EPSG:3414")
           
           rasterMap <-tm_shape(mpsz_3414)+
             tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
             tm_shape(kde_sg_bw_raster) + 
             tm_raster("v", alpha=input$rasterOpacity/100,  
                       palette = "YlOrRd") +
-            tm_layout(legend.position = c("right", "bottom"), frame = FALSE) +
             tmap_options(basemaps = c('OpenStreetMap'))
           
           
@@ -622,15 +639,16 @@ server <- function(input, output) {
           })
         
         output$rasterOutput<- renderLeaflet({
+          proj4string(gridded_region_bw) <- "+proj=tmerc +lat_0=1.366666666666667 +lon_0=103.8333333333333 +k=1 +x_0=28001.642 +y_0=38744.572 +ellps=WGS84 +units=m +no_defs 
+"
           kde_region_bw_raster <- raster(gridded_region_bw)
-          projection(kde_region_bw_raster) <- CRS("+init=EPSG:3414")
+          #projection(kde_region_bw_raster) = CRS("+init=EPSG:3414")
           
           rasterMap <-tm_shape(mpsz_3414)+
             tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
             tm_shape(kde_region_bw_raster) + 
             tm_raster("v", alpha=input$rasterOpacity/100,  
-                      palette = "YlOrRd")
-            tm_layout(legend.position = c("right", "bottom"), frame = FALSE) +
+                      palette = "YlOrRd") +
             tmap_options(basemaps = c('OpenStreetMap'))
           
           
