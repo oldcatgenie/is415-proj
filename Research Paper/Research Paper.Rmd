@@ -1,8 +1,7 @@
 ---
-title: "LandMarkdown: A Spatial Analysis of Industries in Singapore"
-subtitle: Using Spatial Point Patterns Analysis and Geographic Segmentation with Clustering
+title: "LandMarkdown: A Spatial Analysis of Business Entities in Singapore"
 author:
-  - name: CHEONG Wei Herng, Eugene
+  - name: CHEONG Wei Herng Eugene
     email: "whcheong.2018@sis.smu.edu.sg"
     affiliation: Singapore Management University
   - name: CHOY Jing Wei
@@ -12,23 +11,57 @@ author:
     email: "yiqi.kang.2017@sis.smu.edu.sg"
     affiliation: Singapore Management University
 abstract: |
-  This is the first paragraph.
+  Various government initiatives such as Singapore's Smart Nation Initiative have resulted in large amounts of data shared by Singapore's government agencies on public online data portals. However, such data have not been explored or worked on extensively to gain a better understanding on the spatial distribution and geographic segmentation of businesses in Singapore and thus could not be effectively translated into better insights for industry-specific policymaking or business decisions.
   
-  This is the second paragraph.
+  To address this, we designed and developed LandMarkdown, an interactive dashboard which allows policymakers and business management executives to explore and analyse Singapore's corporate entity data and gain insights about the spatial distribution and clusters of businesses.
 bibliography: sigproc.bib
 csl: acm-sig-proceedings.csl
 output: rticles::acm_article
 ---
 
 
-
 # Introduction 
+As Singapore accelerated efforts to digitally transform itself, various government agencies such as the Urban Redevelopment Authority (URA) and the Land Transport Authority (LTA) has released data on public on-line data portals such as data.gov.sg and OneMap. The datasets obtained can be used to track spatial point patterns and identify potential clusters for businesses registered in Singapore. For example, corporate entity data as well as their respective SSIC classification were collected. These data contain information and patterns which can be analysed to provide greater insights on the spatial distribution of businesses and clusters of business categories in Singapore on a subzone level. The insights can possibly lead to improvements in industry policy making and provide useful information for private companies or Government-Linked Companies to make better business decisions.
 
+In practice, the use and analysis of a spatial data tends to be limited to Geographic Information Systems (GIS). However, access to GIS applications tend to be limited. Furthermore, the use of GIS applications are specialised and might not be suited as a decision-making or policy planning tool.
+
+To address these two issues, we designed and developed LandMarkdown - an analytics dashboard which aims to provide government policy makers and business decision makers with a tool to analyse corporate entity data from a spatial analytics point of view.
+
+This paper showcases our research and development work into designing and implementing a dashboard to assist business decision makers and government policy makers in analysing and visualising the spatial distribution of businesses and clusters of business categories in Singapore on a subzone level. Section 1 provides a general introduction of the paper, followed by an overview of the motivation and objectives of our research in Section 2. Section 3 provides a review of the literature detailing relevant work in our research area. We provide a detailed overview of the methodology and the results behind our research efforts in Sections 4 and 5 respectively. In the next section, we discuss the insights enabled from our research efforts, before ending off by concluding how the research can be extended in the future.
+
+# Motivation and Objectives
+Our research and development efforts were motivated by the idea of simplifying analytical tools for the discovery of spatial point patterns and clusters in corporate entity data. Our solution aims to provide government policymakers and business decision makers with an analytical dashboard to visualise the spatial distribution of corporate entities of different industry categories. Our specific objectives are:
+
+1. To visualise the spatial distribution of corporate entities in Singapore by industry categories on an internet-based map such as OpenStreetMap.
+1. To conduct statistical simulations to reveal evidence of clustering using spatial point patterns analysis.
+1. To reveal characteristics of spatially constrained clusters through clustering techniques.
+1. To provide a user-friendly interface which supports the use of a variety of filters and options as dynamic inputs for visualisations.
+1. To display the data on-demand in a tabular format.
 
 # Related Work
+Work has been done on the spatial point patterns and industry concentration analysis in Germany. For example, clusters can positively affect competition by increasing productivity and innovation as well as stimulating the formation of new businesses, through economic effects such as economies of scale [@kosfeld2011].
+
+However, traditional metrics for industry concentration do not account for geospatial effects. They fail to account for the formation of clusters at different geographic scales, and the degree of concentration is not expected to be independent on the reach of grouping of the firms [@kosfeld2011]. Kosfeld et al. introduced a concentration index of the style of Besag’s L function [@besag1977] that is based on the concept of the K function. While Besag’s L function is intended to measure deviations from the CSR process, the new index can be applied to identify the importance of sector-specific and more general industry-specific forces inducing clustering.
+
+In addition, Kosfeld et al. also proposed a feasible testing procedure enabling a usage of the K function approach efficiently for large study regions. For this, Diggle and Chetwynd’s D function approach [@diggle1991] is replaced by a spatial similarity test based on subsamples drawn from the industry under analysis and the reference population.
+
+While concentration of the branches of industry in Germany was only available at spatial scales given by arbitrarily defined regions. While the authors illustrated their K function approach by using selected industries, the authors additionally provided concentration numbers for sixteen German industries within different distance bands.
+
+
 
 
 # Methodology
+As such, we have used *location quotient* as a metric for industrial concentration. The formula for calculating the location quotient of industry *a* in subzone *i* is shown as follows:
+
+$LQ_{a,i} =\frac{\frac{i_{a}}{\sum_{i = 0}^{n}i_{a}}}{\frac{i_{Singapore}}{\sum_{i = 0}^{n}i_{Singapore}}}$
+
+where:
+
+- $LQ_{a,i}$ refers to the Location Quotient for industry *a* in subzone *i*,
+- $i_{a}$ refers to the number of industry *a* in subzone *i*,
+- $\sum_{i = 0}^{n}i_{a}$ refers to the sum of all industries in subzone *i*,
+- $i_{Singapore}$ refers to the number of industry *a* in Singapore,
+- and $\sum_{i = 0}^{n}i_{Singapore}$ refers to the sum of all industries in Singapore.
 
 
 # Results
@@ -37,38 +70,68 @@ output: rticles::acm_article
 # Discussion
 
 
-# Future Work
+# Future Work and Conclusion
 
+
+# Acknowledgement
+The authors wish to thank Dr. Kam Tin Seong, an Associate Professor of Information Systems (Practice) in Singapore Management University for his support and guidance.
 
 # References
 
 ---
 references:
-- id: meier2012
-  title: Professinal Android 4 Application Development
-  author: 
-  - family: Meier
-    given: Reto
-  type: book
-  publisher: John Wiley & Sons, Inc.
-  issued:
-    year: 2012
-    month: 5
-- id: fenner2012a
-  title: One-click science marketing
+- id: kosfeld2011
+  title: Spatial point pattern analysis and industry concentration
   author:
-  - family: Fenner
-    given: Martin
-  container-title: Nature Materials
-  volume: 11
-  URL: 'https://doi.org/10.1038/nmat3283'
-  DOI: 10.1038/nmat3283
-  issue: 4
-  publisher: Nature Publishing Group
-  page: 261-263
+  - family: Kosfeld
+    given: Reinhold
+  - family: Eckey
+    given: Hans-Friedrich
+  - family: Lauridsen
+    fiven: Jørgen
+  container-title: The Annals of Regional Science
+  volume: 47
+  URL: 'https://doi.org/10.1007/s00168-010-0385-5'
+  DOI: 10.1007/s00168-010-0385-5
+  publisher: Springer-Verlag GmbH Germany
+  issue: 2
+  page: 311-328
   type: article-journal
   issued:
-    year: 2012
-    month: 3
+    year: 2011
+    month: 10
+- id: besag1977
+  title: Contribution to the Discussion on Dr. Ripley's Paper
+  author:
+  - family: Besag
+    given: Julian
+  container-title: 'Journal of the Royal Statistical Society: Series B (Methodological)'
+  volume: 39
+  URL: 'https://doi.org/10.1111/j.2517-6161.1977.tb01616.x'
+  DOI: 10.1111/j.2517-6161.1977.tb01616.x
+  publisher: Royal Statistical Society
+  issue: 2
+  page: 192-212
+  type: article-journal
+  issued:
+    year: 1977
+- id: diggle1991
+  title: Second-Order Analysis of Spatial Clustering for Inhomogeneous Populations
+  author:
+  - family: Diggle
+    given: P.J.
+  - family: Chetwynd
+    given: A.G.
+  container-title: Biometrics
+  volume: 47
+  URL: 'https://doi.org/10.2307/2532668'
+  DOI: 10.2307/2532668
+  publisher: International Biometric Society
+  issue: 3
+  page: 1155-1167
+  type: article-journal
+  issued:
+    year: 1991
+    month: 9
 ...
 
