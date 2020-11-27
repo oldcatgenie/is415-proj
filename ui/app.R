@@ -32,6 +32,7 @@ library(tmaptools)
 library(raster)
 library(spatstat)
 library(OpenStreetMap)
+library(spdep)
 
 #-----Importing Aspatial and Spatial Data ------------
 corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
@@ -139,7 +140,9 @@ sg_business_mat <- data.matrix(sg_business)
 
 # ------- UI -----------
 ui <- fluidPage(theme=shinytheme("darkly"),
-                
+      tags$style(type="text/css", "div.info.legend.leaflet-control br {clear: both;}",
+                 ".leaflet .legend {width:200px; text-align: left;}",
+                 ".leaflet .legend label{float:left; text-align: left;}"),          
     # -----Navigation Bar ---------------------
     navbarPage("LandMarkdown", fluid=TRUE, windowTitle="LandMarkdown", selected="overview",
                
@@ -468,9 +471,9 @@ server <- function(input, output) {
       boxmap <- function(vnam, df, legtitle=NA, mtitle="Box Map", mult=1.5){
         var <- get.var(vnam,df)
         bb <- boxbreaks(var)
-        
+          
         tm_shape(df) +
-          tm_fill(vnam,title=legtitle,breaks=bb,palette="-RdBu", id="SUBZONE_N",
+          tm_fill(vnam,title=input$EdaIndustryBoxMap,breaks=bb,palette="-RdBu", id="SUBZONE_N",
                   labels = c("lower outlier",
                              "< 25%",
                              "25% - 50%",
@@ -478,7 +481,7 @@ server <- function(input, output) {
                              "> 75%",
                              "upper outlier")) +
         tm_borders(alpha=0.5) +
-          tm_layout(title = mtitle, title.position = c("right", "bottom"))
+          tm_layout(title = legtitle, title.position = c("right", "bottom"))
       }
       
       output$boxMapOutput <- renderLeaflet({
@@ -564,6 +567,11 @@ server <- function(input, output) {
       
       cluster_vars.cor = cor(mpsz_3414_derived[, get_hash(c(varSelected), LQCategory)])
       
+      colnames(cluster_vars.cor) <- varSelected
+      colnames(cluster_vars.cor)[which(colnames(cluster_vars.cor)=="WATER SUPPLY; SEWERAGE, WASTE MANAGEMENT AND REMEDIATION ACTIVITIES")]="WATER, WASTE MGMT & REMEDIATION"
+      rownames(cluster_vars.cor) <- varSelected
+      rownames(cluster_vars.cor)[which(rownames(cluster_vars.cor)=="WATER SUPPLY; SEWERAGE, WASTE MANAGEMENT AND REMEDIATION ACTIVITIES")]="WATER, WASTE MGMT & REMEDIATION"
+      
       corrplot.mixed(cluster_vars.cor,
                      lower = "ellipse", 
                      upper = "number",
@@ -597,7 +605,6 @@ server <- function(input, output) {
           proj4string(gridded_sg_bw) <- "+proj=tmerc +lat_0=1.366666666666667 +lon_0=103.8333333333333 +k=1 +x_0=28001.642 +y_0=38744.572 +ellps=WGS84 +units=m +no_defs 
 "
           kde_sg_bw_raster <- raster(gridded_sg_bw)
-          #projection(kde_sg_bw_raster) = CRS("+init=EPSG:3414")
           
           rasterMap <-tm_shape(mpsz_3414)+
             tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
@@ -642,7 +649,6 @@ server <- function(input, output) {
           proj4string(gridded_region_bw) <- "+proj=tmerc +lat_0=1.366666666666667 +lon_0=103.8333333333333 +k=1 +x_0=28001.642 +y_0=38744.572 +ellps=WGS84 +units=m +no_defs 
 "
           kde_region_bw_raster <- raster(gridded_region_bw)
-          #projection(kde_region_bw_raster) = CRS("+init=EPSG:3414")
           
           rasterMap <-tm_shape(mpsz_3414)+
             tm_polygons(alpha = 0, border.col = "blue", border.alpha = 0.3, id="SUBZONE_N") +
