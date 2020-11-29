@@ -17,7 +17,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Intalling Required Packages
+# Intalling Required Packages
 
 ```{r message=FALSE}
 packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse')
@@ -29,9 +29,9 @@ for (p in packages){
 }
 ```
 
-## Data Import and Preparation
+# Data Import and Preparation
 
-### Importing Aspatial and Spatial Data
+## Importing Aspatial and Spatial Data
 ```{r}
 corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
 corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
@@ -47,7 +47,7 @@ mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL") %>%
                              "STRAITS VIEW",
                              "TENGAH")))
 ```
-### Checking the CRS for Spatial Data
+## Checking the CRS for Spatial Data
 ```{r}
 mpsz
 ```
@@ -56,14 +56,14 @@ mpsz
 st_crs(mpsz)
 ```
 
-### Transforming the CRS for Spatial Data
+## Transforming the CRS for Spatial Data
 
 ```{r}
 mpsz_3414 <- st_transform(mpsz, 3414)
 st_crs(mpsz_3414)
 ```
 
-### Converting to Spatial or Spatial* Equivalents
+## Converting to Spatial or Spatial* Equivalents
 
 ```{r}
 corp_info_merged_sp <- as(corp_info_merged, "Spatial")
@@ -144,9 +144,9 @@ mpsz_3414 <- mpsz_3414 %>%
   
 ```
 
-## Exploratory Data Analysis
+# Exploratory Data Analysis
 
-### Visualisation of Statistics
+## Visualisation of Statistics
 
 ```{r}
 ggplot(data=mpsz_3414, aes(x=`Category M`)) +
@@ -300,7 +300,7 @@ ggarrange(cat_p, cat_e, cat_k, cat_d, cat_a, cat_o,
           nrow = 2)
 ```
 
-### Choropleths
+## Choropleths
 
 ```{r}
 qtm(mpsz_3414, "Cat H Prop")
@@ -310,15 +310,14 @@ qtm(mpsz_3414, "Cat H Prop")
 qtm(mpsz_3414, "Total")
 ```
 
-### Correlation Analysis
+## Correlation Analysis
 
 ```{r}
 mpsz_3414_derived <- st_drop_geometry(mpsz_3414)
 ```
 
 ```{r}
-clustering_data <- mpsz_3414_derived[,16:33] %>%
-  select(-`Category I`, -`Category L`, -`Category H`, -`Category P`, -`Category N`, -`Category J`, -`Category M`, -`Category F`)
+clustering_data <- mpsz_3414_derived[,35:52]
 ```
 
 ```{r}
@@ -331,11 +330,11 @@ corrplot.mixed(cluster_vars.cor,
                tl.col = "black")
 ```
 
-## Extracting Clustering Variables
+# Extracting Clustering Variables
 
 ```{r}
 cluster_vars <- mpsz_3414_derived %>%
-  select("SUBZONE_N", ends_with("Prop"), -`Cat I Prop`, -`Cat L Prop`, -`Cat H Prop`, -`Cat P Prop`, -`Cat N Prop`, -`Cat J Prop`, -`Cat M Prop`, -`Cat F Prop`)
+  select("SUBZONE_N", ends_with("Prop"))
 head(cluster_vars,10)
 ```
 
@@ -350,21 +349,21 @@ row.names(sg_business) <- cluster_vars$`SUBZONE_N`
 head(sg_business, 10)
 ```
 
-## Data Standardisation
+# Data Standardisation
 
-### Min-max Standardisation
+## Min-max Standardisation
 ```{r}
 sg_business.minmax <- normalize(sg_business)
 summary(sg_business.minmax)
 ```
 
-### Z-score Standardisation
+## Z-score Standardisation
 ```{r}
 sg_business.zscore <- scale(sg_business)
 summary(sg_business.zscore)
 ```
 
-### Visualising the standardised clustering variables
+## Visualising the standardised clustering variables
 ```{r}
 r <- ggplot(data=mpsz_3414_derived, 
              aes(x= `Cat G Prop`)) +
@@ -393,15 +392,15 @@ ggarrange(r, s, z,
           nrow = 1)
 ```
 
-## Hierarchical Cluster Analysis
+# Hierarchical Cluster Analysis
 
-### Computing Proximity Matrix
+## Computing Proximity Matrix
 
 ```{r}
 proxmat <- dist(sg_business, method = 'euclidean')
 ```
 
-### Computing Hierarchical Clustering
+## Computing Hierarchical Clustering
 
 ```{r}
 hclust_ward <- hclust(proxmat, method = 'ward.D')
@@ -411,7 +410,7 @@ hclust_ward <- hclust(proxmat, method = 'ward.D')
 plot(hclust_ward, cex = 0.6)
 ```
 
-### Selecting Optimal Clustering Algorithm
+## Selecting Optimal Clustering Algorithm
 
 ```{r}
 m <- c( "average", "single", "complete", "ward")
@@ -426,7 +425,7 @@ map_dbl(m, ac)
 
 With reference to the output above, we can see that Ward’s method provides the strongest clustering structure among the four methods assessed. Hence, in the subsequent analysis, only Ward’s method will be used.
 
-### Determining Optimal Clusters
+## Determining Optimal Clusters
 
 ```{r}
 set.seed(54321)
@@ -439,14 +438,14 @@ print(gap_stat, method = "firstmax")
 fviz_gap_stat(gap_stat)
 ```
 
-### Interpreting the Dendrogram
+## Interpreting the Dendrogram
 
 ```{r}
 plot(hclust_ward, cex = 0.6)
 rect.hclust(hclust_ward, k = 10, border = 2:5)
 ```
 
-### Visually Driven Hierarchical Analysis
+## Visually Driven Hierarchical Analysis
 
 ```{r}
 sg_business_mat <- data.matrix(sg_business)
@@ -469,7 +468,7 @@ heatmaply(normalize(sg_business_mat),
           )
 ```
 
-### Mapping the Clusters Formed
+## Mapping the Clusters Formed
 
 ```{r}
 groups <- as.factor(cutree(hclust_ward, k=10))
@@ -484,15 +483,15 @@ sg_biz_cluster <- cbind(mpsz_3414, as.matrix(groups)) %>%
 qtm(sg_biz_cluster, "CLUSTER")
 ```
 
-## Spatially Constrained Clustering (SKATER)
+# Spatially Constrained Clustering (SKATER)
 
-### Conversion to SpatialPolygonsDataFrame
+## Conversion to SpatialPolygonsDataFrame
 
 ```{r}
 mpsz_3414_sp <- as_Spatial(mpsz_3414)
 ```
 
-### Computing Neighbour List
+## Computing Neighbour List
 
 ```{r}
 sg.nb <- poly2nb(mpsz_3414_sp)
@@ -518,9 +517,9 @@ plot(mpsz_3414_sp, border=grey(.5))
 plot(sg.nb, coordinates(mpsz_3414_sp), col="blue", add=TRUE)
 ```
 
-### Computing Minimum Spanning Tree
+## Computing Minimum Spanning Tree
 
-#### Calculate Edge Cost
+### Calculate Edge Cost
 
 ```{r}
 lcosts <- nbcosts(sg.nb, sg_business)
@@ -531,7 +530,7 @@ sg.w <- nb2listw(sg.nb, lcosts, style="B")
 summary(sg.w)
 ```
 
-#### Creating Minimum Spanning Tree
+### Creating Minimum Spanning Tree
 
 ```{r}
 sg.mst <- mstree(sg.w)
