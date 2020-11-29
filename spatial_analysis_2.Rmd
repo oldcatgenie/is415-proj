@@ -1,0 +1,1274 @@
+---
+title: "spatial_analysis_4"
+author: "Choy Jing Wei"
+date: "11/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+title: "spatial_analysis_3"
+author: "Choy Jing Wei"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+packages = c('rgdal', 'maptools','raster','spatstat', 'sf', 'spdep', 'tmap', 'tidyverse','OpenStreetMap','tmaptools')
+for (p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+
+# Import csv files
+
+```{r}
+corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
+ssic2020 <- read_csv("data/aspatial/ssic2020.csv")
+postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
+```
+
+# Join columns
+
+```{r}
+corp_info <- left_join(corp_info,ssic2020,by=c('primary_ssic_code' = "SSIC 2020"))
+names(corp_info)[names(corp_info) == 'primary_ssic_code.y'] <- 'primary_ssic_category_description'
+sum(is.na(corp_info))
+```
+
+# Check if there is missing data
+
+```{r}
+sum(is.na(postal_code_geom))
+```
+
+# Merge postal code with corp info
+
+```{r}
+postal_code_geom$postal_code <- as.character(postal_code_geom$postal_code)
+corp_info <- left_join(corp_info,postal_code_geom,by=c('postal_code' = 'postal_code'))
+```
+
+# Check if there is missing data
+
+```{r}
+sum(is.na(corp_info))
+```
+
+# Remove missing data
+
+```{r}
+corp_info <- na.omit(corp_info)
+```
+
+# Write file for finalised dataset
+
+```{r}
+write_csv(corp_info, "data/aspatial/corp_info_merged.csv")
+```
+
+# Read finalised dataset file
+
+```{r}
+corp_info_merged <- read.csv("data/aspatial/corp_info_merged.csv", header = TRUE)
+```
+
+```{r}
+corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
+```
+
+```{r}
+mpsz_sf <- st_read(dsn = "data/geospatial", layer = "MP14_SUBZONE_WEB_PL")
+```
+
+```{r}
+crs(mpsz_sf)
+```
+
+```{r}
+mpsz_sf_3414 <- st_transform(mpsz_sf, 3414)
+crs(mpsz_sf_3414)
+```
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged, "Spatial")
+```
+
+# Converting the spatial point data frame into generic sp format
+
+```{r}
+corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
+```
+
+```{r}
+mpsz_3414_sp <- as(mpsz_sf_3414, "Spatial")
+```
+
+```{r}
+plot(mpsz_3414_sp, border="darkgrey")+
+plot(corp_info_merged_sp, add=TRUE)
+```
+
+# Converting the generic sp format into spatstat’s ppp format
+
+```{r}
+corp_info_merged_ppp <- as(corp_info_merged_sp, "ppp")
+```
+
+# Handling duplicated points
+
+```{r}
+duplicated(corp_info_merged_ppp)
+```
+
+```{r}
+corp_info_merged_ppp_jit <- rjitter(corp_info_merged_ppp, retry=TRUE, nsim=1, drop=TRUE)
+duplicated(corp_info_merged_ppp_jit)
+```
+
+# Creating owin for mpsz
+
+```{r}
+mpsz_owin <- as(mpsz_3414_sp, "owin")
+```
+
+```{r}
+plot(mpsz_owin)
+```
+
+```{r}
+summary(mpsz_owin)
+```
+
+```{r}
+corp_info_merged_ppp = corp_info_merged_ppp_jit[mpsz_owin]
+```
+
+```{r}
+plot(corp_info_merged_ppp)
+```
+
+
+# Removing areas that do not have businesses present
+
+```{r}
+sg <- mpsz_3414_sp[!(mpsz_3414_sp@data$PLN_AREA_N %in% c("NORTH-EASTERN ISLANDS",
+                             "CENTRAL WATER CATCHMENT",
+                             "CHANGI BAY",
+                             "MARINA SOUTH",
+                             "SIMPANG",
+                             "SOUTHERN ISLANDS",
+                             "STRAITS VIEW",
+                             "TENGAH")),]
+```
+
+# Filter by regions
+
+```{r}
+north_region = sg[sg@data$REGION_N == "NORTH REGION",]
+northeast_region = sg[sg@data$REGION_N == "NORTH-EAST REGION",]
+central_region = sg[sg@data$REGION_N == "CENTRAL REGION",]
+west_region = sg[sg@data$REGION_N == "WEST REGION",]
+east_region = sg[sg@data$REGION_N == "EAST REGION",]
+```
+
+```{r}
+unique(mpsz_sf_3414$SUBZONE)
+```
+
+# Filtering by regions
+
+```{r}
+subzone_north_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "NORTH REGION")
+subzone_northeast_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "NORTH-EAST REGION")
+subzone_central_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "CENTRAL REGION")
+subzone_west_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "WEST REGION")
+subzone_east_region <- mpsz_sf_3414 %>%
+  filter(REGION_N == "EAST REGION")
+```
+
+# Converting to Spatial and SpatialPolygons
+
+```{r}
+north_sp <- as(subzone_north_region, "Spatial")
+northeast_sp <- as(subzone_northeast_region, "Spatial")
+central_sp <- as(subzone_central_region, "Spatial")
+west_sp <- as(subzone_west_region, "Spatial")
+east_sp <- as(subzone_east_region, "Spatial")
+```
+
+```{r}
+north_sp <- as(north_sp, "SpatialPolygons")
+northeast_sp <- as(northeast_sp, "SpatialPolygons")
+central_sp <- as(central_sp, "SpatialPolygons")
+west_sp <- as(west_sp, "SpatialPolygons")
+east_sp <- as(east_sp, "SpatialPolygons")
+```
+
+
+# Creating owin for regions and sg
+
+```{r}
+sg_owin <- as(sg, "owin")
+north_owin <- as(north_sp, "owin")
+northeast_owin <- as(northeast_sp, "owin")
+central_owin <- as(central_sp, "owin")
+west_owin <- as(west_sp, "owin")
+east_owin <- as(east_sp, "owin")
+```
+
+```{r}
+plot(sg_owin)
+plot(north_owin)
+plot(northeast_owin)
+plot(central_owin)
+plot(west_owin)
+plot(east_owin)
+```
+
+``
+```{r}
+sg_ppp = corp_info_merged_ppp_jit[sg_owin]
+plot(sg_ppp)
+north_ppp = corp_info_merged_ppp_jit[north_owin]
+plot(north_ppp)
+northeast_ppp = corp_info_merged_ppp_jit[northeast_owin]
+plot(northeast_ppp)
+central_ppp = corp_info_merged_ppp_jit[central_owin]
+plot(central_ppp)
+west_ppp = corp_info_merged_ppp_jit[west_owin]
+plot(west_ppp)
+east_ppp = corp_info_merged_ppp_jit[east_owin]
+plot(east_ppp)
+```
+
+`
+# Kernel Density Estimation
+
+```{r}
+sg_ppp_bw <- density(sg_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+north_ppp_bw <- density(north_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+northeast_ppp_bw <- density(northeast_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+central_ppp_bw <- density(central_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+west_ppp_bw <- density(west_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+east_ppp_bw <- density(east_ppp, sigma=bw.diggle, edge=TRUE, kernel="gaussian")
+```
+
+```{r}
+sg_ppp_bw.km <- rescale(sg_ppp_bw, 1000, "km")
+north_ppp_bw.km <- rescale(north_ppp_bw, 1000, "km")
+northeast_ppp_bw.km <- rescale(northeast_ppp_bw, 1000, "km")
+central_ppp_bw.km <- rescale(central_ppp_bw, 1000, "km")
+west_ppp_bw.km <- rescale(west_ppp_bw, 1000, "km")
+east_ppp_bw.km <- rescale(east_ppp_bw, 1000, "km")
+```
+
+
+```{r}
+plot(sg_ppp_bw.km)
+plot(north_ppp_bw.km)
+plot(northeast_ppp_bw.km)
+plot(central_ppp_bw.km)
+plot(west_ppp_bw.km)
+plot(east_ppp_bw.km)
+```
+
+```{r}
+gridded_sg_bw <- as.SpatialGridDataFrame.im(sg_ppp_bw)
+spplot(gridded_sg_bw)
+
+gridded_north_bw <- as.SpatialGridDataFrame.im(north_ppp_bw)
+spplot(gridded_north_bw)
+
+gridded_northeast_bw <- as.SpatialGridDataFrame.im(northeast_ppp_bw)
+spplot(gridded_northeast_bw)
+
+gridded_central_bw <- as.SpatialGridDataFrame.im(central_ppp_bw)
+spplot(gridded_central_bw)
+
+gridded_west_bw <- as.SpatialGridDataFrame.im(west_ppp_bw)
+spplot(gridded_west_bw)
+
+gridded_east_bw <- as.SpatialGridDataFrame.im(east_ppp_bw)
+spplot(gridded_east_bw)
+```
+
+# Converting gridded output into raster
+
+```{r}
+kde_sg_bw_raster <- raster(gridded_sg_bw)
+kde_north_bw_raster <- raster(gridded_north_bw)
+kde_northeast_bw_raster <- raster(gridded_northeast_bw)
+kde_central_bw_raster <- raster(gridded_central_bw)
+kde_west_bw_raster <- raster(gridded_west_bw)
+kde_east_bw_raster <- raster(gridded_east_bw)
+```
+
+# Assigning projection systems
+
+```{r}
+projection(kde_sg_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_north_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_northeast_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_central_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_west_bw_raster) <- CRS("+init=EPSG:3414")
+projection(kde_east_bw_raster) <- CRS("+init=EPSG:3414")
+```
+
+# Visualising the output in tmap
+
+```{r}
+tmap_mode("view")
+```
+
+```{r}
+tm_shape(kde_sg_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+
+
+# Individual tmap based on regions
+
+```{r}
+tm_shape(kde_north_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+
+
+```{r}
+tm_shape(kde_northeast_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+
+
+```{r}
+tm_shape(kde_central_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+
+
+
+```{r}
+tm_shape(kde_west_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+```{r}
+tm_shape(kde_east_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+```{r}
+tm_shape(kde_northeast_bw_raster) + 
+  tm_raster("v") +
+  tmap_options(basemaps = c('OpenStreetMap'))
+```
+
+
+
+# List of unique industries
+
+```{r}
+sort(unique(corp_info_merged$category))
+```
+
+# Filtering Industries
+
+```{r}
+corp_info_merged_CAT_A <- corp_info_merged %>%
+  filter(category == 'A')
+corp_info_merged_CAT_B <- corp_info_merged %>%
+  filter(category == 'B')
+corp_info_merged_CAT_C <- corp_info_merged %>%
+  filter(category == 'C')
+corp_info_merged_CAT_D <- corp_info_merged %>%
+  filter(category == 'D')
+corp_info_merged_CAT_E <- corp_info_merged %>%
+  filter(category == 'E')
+corp_info_merged_CAT_F <- corp_info_merged %>%
+  filter(category == 'F')
+corp_info_merged_CAT_G <- corp_info_merged %>%
+  filter(category == 'G')
+corp_info_merged_CAT_H <- corp_info_merged %>%
+  filter(category == 'H')
+corp_info_merged_CAT_I <- corp_info_merged %>%
+  filter(category == 'I')
+corp_info_merged_CAT_J <- corp_info_merged %>%
+  filter(category == 'J')
+corp_info_merged_CAT_K <- corp_info_merged %>%
+  filter(category == 'K')
+corp_info_merged_CAT_L <- corp_info_merged %>%
+  filter(category == 'L')
+corp_info_merged_CAT_M <- corp_info_merged %>%
+  filter(category == 'M')
+corp_info_merged_CAT_N <- corp_info_merged %>%
+  filter(category == 'N')
+corp_info_merged_CAT_O <- corp_info_merged %>%
+  filter(category == 'O')
+corp_info_merged_CAT_P <- corp_info_merged %>%
+  filter(category == 'P')
+corp_info_merged_CAT_Q <- corp_info_merged %>%
+  filter(category == 'Q')
+corp_info_merged_CAT_R <- corp_info_merged %>%
+  filter(category == 'R')
+corp_info_merged_CAT_S <- corp_info_merged %>%
+  filter(category == 'S')
+```
+
+# Convert Individual Industries into ppp
+
+
+```{r}
+corp_info_merged_sp_CAT_A <- as(corp_info_merged_CAT_A, "Spatial")
+corp_info_merged_ppp_CAT_A <- as(corp_info_merged_sp_CAT_A, "ppp")
+
+corp_info_merged_sp_CAT_B <- as(corp_info_merged_CAT_B, "Spatial")
+corp_info_merged_ppp_CAT_B <- as(corp_info_merged_sp_CAT_B, "ppp") 
+
+corp_info_merged_sp_CAT_C <- as(corp_info_merged_CAT_C, "Spatial")
+corp_info_merged_ppp_CAT_C <- as(corp_info_merged_sp_CAT_C, "ppp") 
+
+corp_info_merged_sp_CAT_D <- as(corp_info_merged_CAT_D, "Spatial")
+corp_info_merged_ppp_CAT_D <- as(corp_info_merged_sp_CAT_D, "ppp") 
+
+corp_info_merged_sp_CAT_E <- as(corp_info_merged_CAT_E, "Spatial")
+corp_info_merged_ppp_CAT_E <- as(corp_info_merged_sp_CAT_E, "ppp") 
+
+corp_info_merged_sp_CAT_F <- as(corp_info_merged_CAT_F, "Spatial")
+corp_info_merged_ppp_CAT_F <- as(corp_info_merged_sp_CAT_F, "ppp") 
+
+corp_info_merged_sp_CAT_G <- as(corp_info_merged_CAT_G, "Spatial")
+corp_info_merged_ppp_CAT_G <- as(corp_info_merged_sp_CAT_G, "ppp") 
+
+corp_info_merged_sp_CAT_H <- as(corp_info_merged_CAT_H, "Spatial")
+corp_info_merged_ppp_CAT_H <- as(corp_info_merged_sp_CAT_H, "ppp") 
+
+corp_info_merged_sp_CAT_I <- as(corp_info_merged_CAT_I, "Spatial")
+corp_info_merged_ppp_CAT_I <- as(corp_info_merged_sp_CAT_I, "ppp") 
+
+corp_info_merged_sp_CAT_J <- as(corp_info_merged_CAT_J, "Spatial")
+corp_info_merged_ppp_CAT_J <- as(corp_info_merged_sp_CAT_J, "ppp") 
+
+corp_info_merged_sp_CAT_K <- as(corp_info_merged_CAT_K, "Spatial")
+corp_info_merged_ppp_CAT_K <- as(corp_info_merged_sp_CAT_K, "ppp") 
+
+corp_info_merged_sp_CAT_L <- as(corp_info_merged_CAT_L, "Spatial")
+corp_info_merged_ppp_CAT_L <- as(corp_info_merged_sp_CAT_L, "ppp") 
+
+corp_info_merged_sp_CAT_M <- as(corp_info_merged_CAT_M, "Spatial")
+corp_info_merged_ppp_CAT_M <- as(corp_info_merged_sp_CAT_M, "ppp") 
+
+corp_info_merged_sp_CAT_N <- as(corp_info_merged_CAT_N, "Spatial")
+corp_info_merged_ppp_CAT_N <- as(corp_info_merged_sp_CAT_N, "ppp") 
+
+corp_info_merged_sp_CAT_O <- as(corp_info_merged_CAT_O, "Spatial")
+corp_info_merged_ppp_CAT_O <- as(corp_info_merged_sp_CAT_O, "ppp") 
+
+corp_info_merged_sp_CAT_P <- as(corp_info_merged_CAT_P, "Spatial")
+corp_info_merged_ppp_CAT_P <- as(corp_info_merged_sp_CAT_P, "ppp") 
+
+corp_info_merged_sp_CAT_Q <- as(corp_info_merged_CAT_Q, "Spatial")
+corp_info_merged_ppp_CAT_Q <- as(corp_info_merged_sp_CAT_Q, "ppp")
+
+corp_info_merged_sp_CAT_R <- as(corp_info_merged_CAT_R, "Spatial")
+corp_info_merged_ppp_CAT_R <- as(corp_info_merged_sp_CAT_R, "ppp")
+
+corp_info_merged_sp_CAT_S <- as(corp_info_merged_CAT_S, "Spatial")
+corp_info_merged_ppp_CAT_S <- as(corp_info_merged_sp_CAT_S, "ppp")
+```
+
+# Remove duplicated points
+
+```{r}
+corp_info_merged_ppp_jit_A <- rjitter(corp_info_merged_ppp_CAT_A, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_B <- rjitter(corp_info_merged_ppp_CAT_B, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_C <- rjitter(corp_info_merged_ppp_CAT_C, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_D <- rjitter(corp_info_merged_ppp_CAT_D, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_E <- rjitter(corp_info_merged_ppp_CAT_E, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_F <- rjitter(corp_info_merged_ppp_CAT_F, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_G <- rjitter(corp_info_merged_ppp_CAT_G, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_H <- rjitter(corp_info_merged_ppp_CAT_H, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_I <- rjitter(corp_info_merged_ppp_CAT_I, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_J <- rjitter(corp_info_merged_ppp_CAT_J, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_K <- rjitter(corp_info_merged_ppp_CAT_K, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_L <- rjitter(corp_info_merged_ppp_CAT_L, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_M <- rjitter(corp_info_merged_ppp_CAT_M, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_N <- rjitter(corp_info_merged_ppp_CAT_N, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_O <- rjitter(corp_info_merged_ppp_CAT_O, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_P <- rjitter(corp_info_merged_ppp_CAT_P, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_Q <- rjitter(corp_info_merged_ppp_CAT_Q, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_R <- rjitter(corp_info_merged_ppp_CAT_R, retry=TRUE, nsim=1, drop=TRUE)
+corp_info_merged_ppp_jit_S <- rjitter(corp_info_merged_ppp_CAT_S, retry=TRUE, nsim=1, drop=TRUE)
+```
+
+# Unmarking Variables for all regions for each industry
+
+```{r}
+corp_info_merged_ppp_jit_A <- unmark(corp_info_merged_ppp_jit_A)
+northeast_ppp_A = corp_info_merged_ppp_jit_A[northeast_owin]
+plot(northeast_ppp_A)
+
+corp_info_merged_ppp_jit_B <- unmark(corp_info_merged_ppp_jit_B)
+northeast_ppp_B = corp_info_merged_ppp_jit_B[northeast_owin]
+plot(northeast_ppp_B)
+
+corp_info_merged_ppp_jit_C <- unmark(corp_info_merged_ppp_jit_C)
+northeast_ppp_C = corp_info_merged_ppp_jit_C[northeast_owin]
+plot(northeast_ppp_C)
+
+corp_info_merged_ppp_jit_D <- unmark(corp_info_merged_ppp_jit_D)
+northeast_ppp_D = corp_info_merged_ppp_jit_D[northeast_owin]
+plot(northeast_ppp_D)
+
+corp_info_merged_ppp_jit_E <- unmark(corp_info_merged_ppp_jit_E)
+northeast_ppp_E = corp_info_merged_ppp_jit_E[northeast_owin]
+plot(northeast_ppp_E)
+
+corp_info_merged_ppp_jit_F <- unmark(corp_info_merged_ppp_jit_F)
+northeast_ppp_F = corp_info_merged_ppp_jit_F[northeast_owin]
+plot(northeast_ppp_F)
+
+corp_info_merged_ppp_jit_G <- unmark(corp_info_merged_ppp_jit_G)
+northeast_ppp_G = corp_info_merged_ppp_jit_G[northeast_owin]
+plot(northeast_ppp_G)
+
+corp_info_merged_ppp_jit_H <- unmark(corp_info_merged_ppp_jit_H)
+northeast_ppp_H = corp_info_merged_ppp_jit_H[northeast_owin]
+plot(northeast_ppp_H)
+
+corp_info_merged_ppp_jit_I <- unmark(corp_info_merged_ppp_jit_I)
+northeast_ppp_I = corp_info_merged_ppp_jit_I[northeast_owin]
+plot(northeast_ppp_I)
+
+corp_info_merged_ppp_jit_J <- unmark(corp_info_merged_ppp_jit_J)
+northeast_ppp_J = corp_info_merged_ppp_jit_J[northeast_owin]
+plot(northeast_ppp_J)
+
+corp_info_merged_ppp_jit_K <- unmark(corp_info_merged_ppp_jit_K)
+northeast_ppp_K = corp_info_merged_ppp_jit_K[northeast_owin]
+plot(northeast_ppp_K)
+
+corp_info_merged_ppp_jit_L <- unmark(corp_info_merged_ppp_jit_L)
+northeast_ppp_L = corp_info_merged_ppp_jit_L[northeast_owin]
+plot(northeast_ppp_L)
+
+corp_info_merged_ppp_jit_M <- unmark(corp_info_merged_ppp_jit_M)
+northeast_ppp_M = corp_info_merged_ppp_jit_M[northeast_owin]
+plot(northeast_ppp_M)
+
+corp_info_merged_ppp_jit_N <- unmark(corp_info_merged_ppp_jit_N)
+northeast_ppp_N = corp_info_merged_ppp_jit_N[northeast_owin]
+plot(northeast_ppp_N)
+
+corp_info_merged_ppp_jit_O <- unmark(corp_info_merged_ppp_jit_O)
+northeast_ppp_O = corp_info_merged_ppp_jit_O[northeast_owin]
+plot(northeast_ppp_O)
+
+corp_info_merged_ppp_jit_P <- unmark(corp_info_merged_ppp_jit_P)
+northeast_ppp_P = corp_info_merged_ppp_jit_P[northeast_owin]
+plot(northeast_ppp_P)
+
+corp_info_merged_ppp_jit_Q <- unmark(corp_info_merged_ppp_jit_Q)
+northeast_ppp_Q = corp_info_merged_ppp_jit_Q[northeast_owin]
+plot(northeast_ppp_Q)
+
+corp_info_merged_ppp_jit_R <- unmark(corp_info_merged_ppp_jit_R)
+northeast_ppp_R = corp_info_merged_ppp_jit_R[northeast_owin]
+plot(northeast_ppp_R)
+
+corp_info_merged_ppp_jit_S <- unmark(corp_info_merged_ppp_jit_S)
+northeast_ppp_S = corp_info_merged_ppp_jit_S[northeast_owin]
+plot(northeast_ppp_S)
+```
+
+```{r}
+corp_info_merged_ppp_jit_A <- unmark(corp_info_merged_ppp_jit_A)
+north_ppp_A = corp_info_merged_ppp_jit_A[north_owin]
+plot(north_ppp_A)
+
+corp_info_merged_ppp_jit_B <- unmark(corp_info_merged_ppp_jit_B)
+north_ppp_B = corp_info_merged_ppp_jit_B[north_owin]
+plot(north_ppp_B)
+
+corp_info_merged_ppp_jit_C <- unmark(corp_info_merged_ppp_jit_C)
+north_ppp_C = corp_info_merged_ppp_jit_C[north_owin]
+plot(north_ppp_C)
+
+corp_info_merged_ppp_jit_D <- unmark(corp_info_merged_ppp_jit_D)
+north_ppp_D = corp_info_merged_ppp_jit_D[north_owin]
+plot(north_ppp_D)
+
+corp_info_merged_ppp_jit_E <- unmark(corp_info_merged_ppp_jit_E)
+north_ppp_E = corp_info_merged_ppp_jit_E[north_owin]
+plot(north_ppp_E)
+
+corp_info_merged_ppp_jit_F <- unmark(corp_info_merged_ppp_jit_F)
+north_ppp_F = corp_info_merged_ppp_jit_F[north_owin]
+plot(north_ppp_F)
+
+corp_info_merged_ppp_jit_G <- unmark(corp_info_merged_ppp_jit_G)
+north_ppp_G = corp_info_merged_ppp_jit_G[north_owin]
+plot(north_ppp_G)
+
+corp_info_merged_ppp_jit_H <- unmark(corp_info_merged_ppp_jit_H)
+north_ppp_H = corp_info_merged_ppp_jit_H[north_owin]
+plot(north_ppp_H)
+
+corp_info_merged_ppp_jit_I <- unmark(corp_info_merged_ppp_jit_I)
+north_ppp_I = corp_info_merged_ppp_jit_I[north_owin]
+plot(north_ppp_I)
+
+corp_info_merged_ppp_jit_J <- unmark(corp_info_merged_ppp_jit_J)
+north_ppp_J = corp_info_merged_ppp_jit_J[north_owin]
+plot(north_ppp_J)
+
+corp_info_merged_ppp_jit_K <- unmark(corp_info_merged_ppp_jit_K)
+north_ppp_K = corp_info_merged_ppp_jit_K[north_owin]
+plot(north_ppp_K)
+
+corp_info_merged_ppp_jit_L <- unmark(corp_info_merged_ppp_jit_L)
+north_ppp_L = corp_info_merged_ppp_jit_L[north_owin]
+plot(north_ppp_L)
+
+corp_info_merged_ppp_jit_M <- unmark(corp_info_merged_ppp_jit_M)
+north_ppp_M = corp_info_merged_ppp_jit_M[north_owin]
+plot(north_ppp_M)
+
+corp_info_merged_ppp_jit_N <- unmark(corp_info_merged_ppp_jit_N)
+north_ppp_N = corp_info_merged_ppp_jit_N[north_owin]
+plot(north_ppp_N)
+
+corp_info_merged_ppp_jit_O <- unmark(corp_info_merged_ppp_jit_O)
+north_ppp_O = corp_info_merged_ppp_jit_O[north_owin]
+plot(north_ppp_O)
+
+corp_info_merged_ppp_jit_P <- unmark(corp_info_merged_ppp_jit_P)
+north_ppp_P = corp_info_merged_ppp_jit_P[north_owin]
+plot(north_ppp_P)
+
+corp_info_merged_ppp_jit_Q <- unmark(corp_info_merged_ppp_jit_Q)
+north_ppp_Q = corp_info_merged_ppp_jit_Q[north_owin]
+plot(north_ppp_Q)
+
+corp_info_merged_ppp_jit_R <- unmark(corp_info_merged_ppp_jit_R)
+north_ppp_R = corp_info_merged_ppp_jit_R[north_owin]
+plot(north_ppp_R)
+
+corp_info_merged_ppp_jit_S <- unmark(corp_info_merged_ppp_jit_S)
+north_ppp_S = corp_info_merged_ppp_jit_S[north_owin]
+plot(north_ppp_S)
+```
+
+```{r}
+corp_info_merged_ppp_jit_A <- unmark(corp_info_merged_ppp_jit_A)
+central_ppp_A = corp_info_merged_ppp_jit_A[central_owin]
+plot(central_ppp_A)
+
+corp_info_merged_ppp_jit_B <- unmark(corp_info_merged_ppp_jit_B)
+central_ppp_B = corp_info_merged_ppp_jit_B[central_owin]
+plot(central_ppp_B)
+
+corp_info_merged_ppp_jit_C <- unmark(corp_info_merged_ppp_jit_C)
+central_ppp_C = corp_info_merged_ppp_jit_C[central_owin]
+plot(central_ppp_C)
+
+corp_info_merged_ppp_jit_D <- unmark(corp_info_merged_ppp_jit_D)
+central_ppp_D = corp_info_merged_ppp_jit_D[central_owin]
+plot(central_ppp_D)
+
+corp_info_merged_ppp_jit_E <- unmark(corp_info_merged_ppp_jit_E)
+central_ppp_E = corp_info_merged_ppp_jit_E[central_owin]
+plot(central_ppp_E)
+
+corp_info_merged_ppp_jit_F <- unmark(corp_info_merged_ppp_jit_F)
+central_ppp_F = corp_info_merged_ppp_jit_F[central_owin]
+plot(central_ppp_F)
+
+corp_info_merged_ppp_jit_G <- unmark(corp_info_merged_ppp_jit_G)
+central_ppp_G = corp_info_merged_ppp_jit_G[central_owin]
+plot(central_ppp_G)
+
+corp_info_merged_ppp_jit_H <- unmark(corp_info_merged_ppp_jit_H)
+central_ppp_H = corp_info_merged_ppp_jit_H[central_owin]
+plot(central_ppp_H)
+
+corp_info_merged_ppp_jit_I <- unmark(corp_info_merged_ppp_jit_I)
+central_ppp_I = corp_info_merged_ppp_jit_I[central_owin]
+plot(central_ppp_I)
+
+corp_info_merged_ppp_jit_J <- unmark(corp_info_merged_ppp_jit_J)
+central_ppp_J = corp_info_merged_ppp_jit_J[central_owin]
+plot(central_ppp_J)
+
+corp_info_merged_ppp_jit_K <- unmark(corp_info_merged_ppp_jit_K)
+central_ppp_K = corp_info_merged_ppp_jit_K[central_owin]
+plot(central_ppp_K)
+
+corp_info_merged_ppp_jit_L <- unmark(corp_info_merged_ppp_jit_L)
+central_ppp_L = corp_info_merged_ppp_jit_L[central_owin]
+plot(central_ppp_L)
+
+corp_info_merged_ppp_jit_M <- unmark(corp_info_merged_ppp_jit_M)
+central_ppp_M = corp_info_merged_ppp_jit_M[central_owin]
+plot(central_ppp_M)
+
+corp_info_merged_ppp_jit_N <- unmark(corp_info_merged_ppp_jit_N)
+central_ppp_N = corp_info_merged_ppp_jit_N[central_owin]
+plot(central_ppp_N)
+
+corp_info_merged_ppp_jit_O <- unmark(corp_info_merged_ppp_jit_O)
+central_ppp_O = corp_info_merged_ppp_jit_O[north_owin]
+plot(central_ppp_O)
+
+corp_info_merged_ppp_jit_P <- unmark(corp_info_merged_ppp_jit_P)
+central_ppp_P = corp_info_merged_ppp_jit_P[central_owin]
+plot(central_ppp_P)
+
+corp_info_merged_ppp_jit_Q <- unmark(corp_info_merged_ppp_jit_Q)
+central_ppp_Q = corp_info_merged_ppp_jit_Q[central_owin]
+plot(central_ppp_Q)
+
+corp_info_merged_ppp_jit_R <- unmark(corp_info_merged_ppp_jit_R)
+central_ppp_R = corp_info_merged_ppp_jit_R[central_owin]
+plot(central_ppp_R)
+
+corp_info_merged_ppp_jit_S <- unmark(corp_info_merged_ppp_jit_S)
+central_ppp_S = corp_info_merged_ppp_jit_S[central_owin]
+plot(central_ppp_S)
+```
+
+```{r}
+corp_info_merged_ppp_jit_A <- unmark(corp_info_merged_ppp_jit_A)
+east_ppp_A = corp_info_merged_ppp_jit_A[east_owin]
+plot(east_ppp_A)
+
+corp_info_merged_ppp_jit_B <- unmark(corp_info_merged_ppp_jit_B)
+east_ppp_B = corp_info_merged_ppp_jit_B[east_owin]
+plot(east_ppp_B)
+
+corp_info_merged_ppp_jit_C <- unmark(corp_info_merged_ppp_jit_C)
+east_ppp_C = corp_info_merged_ppp_jit_C[east_owin]
+plot(east_ppp_C)
+
+corp_info_merged_ppp_jit_D <- unmark(corp_info_merged_ppp_jit_D)
+east_ppp_D = corp_info_merged_ppp_jit_D[east_owin]
+plot(east_ppp_D)
+
+corp_info_merged_ppp_jit_E <- unmark(corp_info_merged_ppp_jit_E)
+east_ppp_E = corp_info_merged_ppp_jit_E[east_owin]
+plot(east_ppp_E)
+
+corp_info_merged_ppp_jit_F <- unmark(corp_info_merged_ppp_jit_F)
+east_ppp_F = corp_info_merged_ppp_jit_F[east_owin]
+plot(east_ppp_F)
+
+corp_info_merged_ppp_jit_G <- unmark(corp_info_merged_ppp_jit_G)
+east_ppp_G = corp_info_merged_ppp_jit_G[east_owin]
+plot(east_ppp_G)
+
+corp_info_merged_ppp_jit_H <- unmark(corp_info_merged_ppp_jit_H)
+east_ppp_H = corp_info_merged_ppp_jit_H[east_owin]
+plot(east_ppp_H)
+
+corp_info_merged_ppp_jit_I <- unmark(corp_info_merged_ppp_jit_I)
+east_ppp_I = corp_info_merged_ppp_jit_I[east_owin]
+plot(east_ppp_I)
+
+corp_info_merged_ppp_jit_J <- unmark(corp_info_merged_ppp_jit_J)
+east_ppp_J = corp_info_merged_ppp_jit_J[east_owin]
+plot(east_ppp_J)
+
+corp_info_merged_ppp_jit_K <- unmark(corp_info_merged_ppp_jit_K)
+east_ppp_K = corp_info_merged_ppp_jit_K[east_owin]
+plot(east_ppp_K)
+
+corp_info_merged_ppp_jit_L <- unmark(corp_info_merged_ppp_jit_L)
+east_ppp_L = corp_info_merged_ppp_jit_L[east_owin]
+plot(east_ppp_L)
+
+corp_info_merged_ppp_jit_M <- unmark(corp_info_merged_ppp_jit_M)
+east_ppp_M = corp_info_merged_ppp_jit_M[east_owin]
+plot(east_ppp_M)
+
+corp_info_merged_ppp_jit_N <- unmark(corp_info_merged_ppp_jit_N)
+east_ppp_N = corp_info_merged_ppp_jit_N[east_owin]
+plot(east_ppp_N)
+
+corp_info_merged_ppp_jit_O <- unmark(corp_info_merged_ppp_jit_O)
+east_ppp_O = corp_info_merged_ppp_jit_O[east_owin]
+plot(east_ppp_O)
+
+corp_info_merged_ppp_jit_P <- unmark(corp_info_merged_ppp_jit_P)
+east_ppp_P = corp_info_merged_ppp_jit_P[east_owin]
+plot(east_ppp_P)
+
+corp_info_merged_ppp_jit_Q <- unmark(corp_info_merged_ppp_jit_Q)
+east_ppp_Q = corp_info_merged_ppp_jit_Q[east_owin]
+plot(east_ppp_Q)
+
+corp_info_merged_ppp_jit_R <- unmark(corp_info_merged_ppp_jit_R)
+east_ppp_R = corp_info_merged_ppp_jit_R[east_owin]
+plot(east_ppp_R)
+
+corp_info_merged_ppp_jit_S <- unmark(corp_info_merged_ppp_jit_S)
+east_ppp_S = corp_info_merged_ppp_jit_S[east_owin]
+plot(east_ppp_S)
+```
+
+```{r}
+corp_info_merged_ppp_jit_A <- unmark(corp_info_merged_ppp_jit_A)
+west_ppp_A = corp_info_merged_ppp_jit_A[west_owin]
+plot(west_ppp_A)
+
+corp_info_merged_ppp_jit_B <- unmark(corp_info_merged_ppp_jit_B)
+west_ppp_B = corp_info_merged_ppp_jit_B[west_owin]
+plot(west_ppp_B)
+
+corp_info_merged_ppp_jit_C <- unmark(corp_info_merged_ppp_jit_C)
+west_ppp_C = corp_info_merged_ppp_jit_C[west_owin]
+plot(west_ppp_C)
+
+corp_info_merged_ppp_jit_D <- unmark(corp_info_merged_ppp_jit_D)
+west_ppp_D = corp_info_merged_ppp_jit_D[west_owin]
+plot(west_ppp_D)
+
+corp_info_merged_ppp_jit_E <- unmark(corp_info_merged_ppp_jit_E)
+west_ppp_E = corp_info_merged_ppp_jit_E[west_owin]
+plot(west_ppp_E)
+
+corp_info_merged_ppp_jit_F <- unmark(corp_info_merged_ppp_jit_F)
+west_ppp_F = corp_info_merged_ppp_jit_F[west_owin]
+plot(west_ppp_F)
+
+corp_info_merged_ppp_jit_G <- unmark(corp_info_merged_ppp_jit_G)
+west_ppp_G = corp_info_merged_ppp_jit_G[west_owin]
+plot(west_ppp_G)
+
+corp_info_merged_ppp_jit_H <- unmark(corp_info_merged_ppp_jit_H)
+west_ppp_H = corp_info_merged_ppp_jit_H[west_owin]
+plot(west_ppp_H)
+
+corp_info_merged_ppp_jit_I <- unmark(corp_info_merged_ppp_jit_I)
+west_ppp_I = corp_info_merged_ppp_jit_I[west_owin]
+plot(west_ppp_I)
+
+corp_info_merged_ppp_jit_J <- unmark(corp_info_merged_ppp_jit_J)
+west_ppp_J = corp_info_merged_ppp_jit_J[west_owin]
+plot(west_ppp_J)
+
+corp_info_merged_ppp_jit_K <- unmark(corp_info_merged_ppp_jit_K)
+west_ppp_K = corp_info_merged_ppp_jit_K[west_owin]
+plot(west_ppp_K)
+
+corp_info_merged_ppp_jit_L <- unmark(corp_info_merged_ppp_jit_L)
+west_ppp_L = corp_info_merged_ppp_jit_L[west_owin]
+plot(west_ppp_L)
+
+corp_info_merged_ppp_jit_M <- unmark(corp_info_merged_ppp_jit_M)
+west_ppp_M = corp_info_merged_ppp_jit_M[west_owin]
+plot(west_ppp_M)
+
+corp_info_merged_ppp_jit_N <- unmark(corp_info_merged_ppp_jit_N)
+west_ppp_N = corp_info_merged_ppp_jit_N[west_owin]
+plot(west_ppp_N)
+
+corp_info_merged_ppp_jit_O <- unmark(corp_info_merged_ppp_jit_O)
+west_ppp_O = corp_info_merged_ppp_jit_O[west_owin]
+plot(west_ppp_O)
+
+corp_info_merged_ppp_jit_P <- unmark(corp_info_merged_ppp_jit_P)
+west_ppp_P = corp_info_merged_ppp_jit_P[west_owin]
+plot(west_ppp_P)
+
+corp_info_merged_ppp_jit_Q <- unmark(corp_info_merged_ppp_jit_Q)
+west_ppp_Q = corp_info_merged_ppp_jit_Q[west_owin]
+plot(west_ppp_Q)
+
+corp_info_merged_ppp_jit_R <- unmark(corp_info_merged_ppp_jit_R)
+west_ppp_R = corp_info_merged_ppp_jit_R[west_owin]
+plot(west_ppp_R)
+
+corp_info_merged_ppp_jit_S <- unmark(corp_info_merged_ppp_jit_S)
+west_ppp_S = corp_info_merged_ppp_jit_S[west_owin]
+plot(west_ppp_S)
+```
+
+# Identify number of companies in each industry
+
+```{r}
+cat_list <- c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S")
+```
+
+```{r}
+nrow(corp_info_merged[corp_info_merged$category == "A",])
+nrow(corp_info_merged[corp_info_merged$category == "B",])
+nrow(corp_info_merged[corp_info_merged$category == "C",])
+nrow(corp_info_merged[corp_info_merged$category == "D",])
+nrow(corp_info_merged[corp_info_merged$category == "E",])
+nrow(corp_info_merged[corp_info_merged$category == "F",])
+nrow(corp_info_merged[corp_info_merged$category == "G",])
+nrow(corp_info_merged[corp_info_merged$category == "H",])
+nrow(corp_info_merged[corp_info_merged$category == "I",])
+nrow(corp_info_merged[corp_info_merged$category == "J",])
+nrow(corp_info_merged[corp_info_merged$category == "K",])
+nrow(corp_info_merged[corp_info_merged$category == "L",])
+nrow(corp_info_merged[corp_info_merged$category == "M",])
+nrow(corp_info_merged[corp_info_merged$category == "N",])
+nrow(corp_info_merged[corp_info_merged$category == "O",])
+nrow(corp_info_merged[corp_info_merged$category == "P",])
+nrow(corp_info_merged[corp_info_merged$category == "Q",])
+nrow(corp_info_merged[corp_info_merged$category == "R",])
+nrow(corp_info_merged[corp_info_merged$category == "S",])
+nrow(corp_info_merged)
+```
+
+```{r}
+sort(unique(corp_info_merged$primary_ssic_category_description))
+```
+
+# North East L-function
+
+```{r}
+L_pa_NE_A = Lest(northeast_ppp_A, correction = "Ripley")
+plot(L_pa_NE_A, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North East A")
+```
+
+```{r}
+L_pa_NE_B = Lest(northeast_ppp_B, correction = "Ripley")
+plot(L_pa_NE_B, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North East B")
+```
+
+```{r}
+L_pa_NE_D = Lest(northeast_ppp_D, correction = "Ripley")
+plot(L_pa_NE_D, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North East D")
+```
+
+```{r}
+L_pa_NE_E = Lest(northeast_ppp_E, correction = "Ripley")
+plot(L_pa_NE_E, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North East E")
+```
+
+
+```{r}
+L_NE_A.csr <- envelope(northeast_ppp_A, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_NE_B.csr <- envelope(northeast_ppp_B, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_NE_D.csr <- envelope(northeast_ppp_D, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_NE_E.csr <- envelope(northeast_ppp_E, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+plot(L_NE_A.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North East for CAT A")
+```
+
+```{r}
+plot(L_NE_B.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North East for CAT B")
+```
+
+```{r}
+plot(L_NE_D.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North East for CAT D")
+```
+
+```{r}
+plot(L_NE_E.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North East for CAT E")
+```
+
+# North L-function
+
+```{r}
+L_pa_N_A = Lest(north_ppp_A, correction = "Ripley")
+plot(L_pa_N_A, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North A")
+```
+
+```{r}
+L_pa_N_B = Lest(north_ppp_B, correction = "Ripley")
+plot(L_pa_N_B, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North B")
+```
+
+```{r}
+L_pa_N_D = Lest(north_ppp_D, correction = "Ripley")
+plot(L_pa_N_D, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North D")
+```
+
+```{r}
+L_pa_N_E = Lest(north_ppp_E, correction = "Ripley")
+plot(L_pa_N_E, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for North E")
+```
+
+```{r}
+L_N_A.csr <- envelope(north_ppp_A, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_N_B.csr <- envelope(north_ppp_B, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_N_D.csr <- envelope(north_ppp_D, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_N_E.csr <- envelope(north_ppp_E, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+plot(L_N_A.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North for CAT A")
+```
+
+```{r}
+plot(L_N_B.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North for CAT B")
+```
+
+```{r}
+plot(L_N_D.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North for CAT D")
+```
+
+```{r}
+plot(L_N_E.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in North for CAT E")
+```
+
+# Central L-function
+
+```{r}
+L_pa_C_A = Lest(central_ppp_A, correction = "Ripley")
+plot(L_pa_C_A, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for Central A")
+```
+
+```{r}
+L_pa_C_B = Lest(central_ppp_B, correction = "Ripley")
+plot(L_pa_C_B, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for Central B")
+```
+
+```{r}
+L_pa_C_D = Lest(central_ppp_D, correction = "Ripley")
+plot(L_pa_C_D, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for Central D")
+```
+
+```{r}
+L_pa_C_E = Lest(central_ppp_E, correction = "Ripley")
+plot(L_pa_C_E, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for Central E")
+```
+
+```{r}
+L_C_A.csr <- envelope(central_ppp_A, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_C_B.csr <- envelope(central_ppp_B, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_C_D.csr <- envelope(central_ppp_D, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_C_E.csr <- envelope(central_ppp_E, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+plot(L_C_A.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in Central for CAT A")
+```
+
+```{r}
+plot(L_C_B.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in Central for CAT B")
+```
+
+```{r}
+plot(L_C_D.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in Central for CAT D")
+```
+
+```{r}
+plot(L_C_E.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in Central for CAT E")
+```
+
+# East L-function
+
+```{r}
+L_pa_E_A = Lest(east_ppp_A, correction = "Ripley")
+plot(L_pa_E_A, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for East A")
+```
+
+```{r}
+L_pa_E_B = Lest(east_ppp_B, correction = "Ripley")
+plot(L_pa_E_B, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for East B")
+```
+
+```{r}
+L_pa_E_D = Lest(east_ppp_D, correction = "Ripley")
+plot(L_pa_E_D, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for East D")
+```
+
+```{r}
+L_pa_E_E = Lest(east_ppp_E, correction = "Ripley")
+plot(L_pa_E_E, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for East E")
+```
+
+```{r}
+L_E_A.csr <- envelope(east_ppp_A, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_E_B.csr <- envelope(east_ppp_B, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_E_D.csr <- envelope(east_ppp_D, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_E_E.csr <- envelope(east_ppp_E, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+plot(L_E_A.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in East for CAT A")
+```
+
+```{r}
+plot(L_E_B.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in East for CAT B")
+```
+
+```{r}
+plot(L_E_D.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in East for CAT D")
+```
+
+```{r}
+plot(L_E_E.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in East for CAT E")
+```
+
+# West L-function
+
+```{r}
+L_pa_W_A = Lest(west_ppp_A, correction = "Ripley")
+plot(L_pa_W_A, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for West A")
+```
+
+```{r}
+L_pa_W_B = Lest(west_ppp_B, correction = "Ripley")
+plot(L_pa_W_B, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for West B")
+```
+
+```{r}
+L_pa_W_D = Lest(west_ppp_D, correction = "Ripley")
+plot(L_pa_W_D, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for West D")
+```
+
+```{r}
+L_pa_W_E = Lest(west_ppp_E, correction = "Ripley")
+plot(L_pa_W_E, . -r ~ r, 
+     ylab= "L(d)-r", xlab = "d(m)", main = "L-function for West E")
+```
+
+```{r}
+L_W_A.csr <- envelope(west_ppp_A, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_W_B.csr <- envelope(west_ppp_B, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_W_D.csr <- envelope(west_ppp_D, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+L_W_E.csr <- envelope(west_ppp_E, Lest, nsim = 39, rank = 1, glocal=TRUE)
+```
+
+```{r}
+plot(L_W_A.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in West for CAT A")
+```
+
+```{r}
+plot(L_W_B.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in West for CAT B")
+```
+
+```{r}
+plot(L_W_D.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in West for CAT D")
+```
+
+```{r}
+plot(L_W_E.csr, . - r ~ r, 
+     xlab="d", ylab="L(d)-r", xlim=c(0,500), main = "Monte Carlo for L-function in West for CAT E")
+```
+
