@@ -19,6 +19,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Intalling Required Packages
 
+We use the following code chunk to install and load the required libraries for the cluster analysis.
+
 ```{r message=FALSE}
 packages = c('rgdal', 'spdep', 'tmap', 'sf', 'ggpubr', 'cluster', 'factoextra', 'NbClust', 'heatmaply', 'corrplot', 'psych', 'tidyverse')
 for (p in packages){
@@ -32,6 +34,9 @@ for (p in packages){
 # Data Import and Preparation
 
 ## Importing Aspatial and Spatial Data
+
+We import our aspatial and spatial data using the code chunk below. Since there are a few planning areas which have no businesses, we have also filtered them out.
+
 ```{r}
 corp_info_merged <- read_csv("data/aspatial/corp_info_merged.csv")
 corp_info_merged <- st_as_sf(corp_info_merged, coords = c('X_coord','Y_coord'), crs = 3414)
@@ -47,7 +52,10 @@ mpsz <- st_read(dsn = "data/geospatial", layer="MP14_SUBZONE_WEB_PL") %>%
                              "STRAITS VIEW",
                              "TENGAH")))
 ```
+
 ## Checking the CRS for Spatial Data
+
+We use the following code chunks to inspect the spatial data and to view its CRS.
 ```{r}
 mpsz
 ```
@@ -58,12 +66,16 @@ st_crs(mpsz)
 
 ## Transforming the CRS for Spatial Data
 
+We then transform the CRS of *mpsz* into EPSG 3414, a projected co-ordinate reference system, so that we can use it togther with the geometry data of the postal codes, which are in X and Y-coordinates.
+
 ```{r}
 mpsz_3414 <- st_transform(mpsz, 3414)
 st_crs(mpsz_3414)
 ```
 
 ## Converting to Spatial or Spatial* Equivalents
+
+We uise the following code chunks to convert *corp_info_merged_sp* and *mpsz_sp* into SpatialPoints and Spatial classes respectively.
 
 ```{r}
 corp_info_merged_sp <- as(corp_info_merged, "Spatial")
@@ -77,14 +89,20 @@ corp_info_merged_sp <- as(corp_info_merged_sp, "SpatialPoints")
 mpsz_sp <- as(mpsz_3414, "Spatial")
 ```
 
+We then plot the spatial points over the subzones of Singapore using the code chunk below.
+
 ```{r}
 plot(mpsz_sp, border="darkgrey") +
 plot(corp_info_merged_sp, add=TRUE)
 ```
 
+We identify the unique values of categories in *corp_info_merged* using the code chunk below.
+
 ```{r}
 unique(corp_info_merged$category)
 ```
+
+We then use the code chunks below to identify how many corporate entities of each category are in each subzones, and append the total number as a new column in *mpsz_3414*.
 
 ```{r}
 for (category_id in unique(corp_info_merged$category)) {
@@ -102,6 +120,8 @@ mpsz_3414 <- mpsz_3414 %>%
 ```{r}
 print(mean(mpsz_3414$Total))
 ```
+
+We use the code chunk below to calculate the Location Quotient which we will use as a measure of industry concentration. This measure will then be our cluster variables when we perform geographic segmentation.
 
 ```{r}
 mpsz_3414 <- mpsz_3414 %>%
@@ -147,6 +167,8 @@ mpsz_3414 <- mpsz_3414 %>%
 # Exploratory Data Analysis
 
 ## Visualisation of Statistics
+
+We use the code chunks in this section to view the distributions of each industry category using histograms and boxplots.
 
 ```{r}
 ggplot(data=mpsz_3414, aes(x=`Category M`)) +
@@ -302,6 +324,8 @@ ggarrange(cat_p, cat_e, cat_k, cat_d, cat_a, cat_o,
 
 ## Choropleths
 
+The code chunk in this section shows choropleth maps made using *qtm()* for the location quotient of a particular industry category, or as the total sum of all industries.
+
 ```{r}
 qtm(mpsz_3414, "Cat H Prop")
 ```
@@ -311,6 +335,8 @@ qtm(mpsz_3414, "Total")
 ```
 
 ## Correlation Analysis
+
+We drop the geometry of *mpsz_3414* using the code chunk below.
 
 ```{r}
 mpsz_3414_derived <- st_drop_geometry(mpsz_3414)
@@ -554,6 +580,8 @@ plot.mst(sg.mst, coordinates(mpsz_sp),
      col="blue", cex.lab=0.7, cex.circles=0.005, add=TRUE)
 ```
 
+### Conduct SKATER
+
 ```{r}
 skaterclust <- skater(sg.mst[,1:2], sg_business, method = "euclidean", 9)
 ```
@@ -572,6 +600,8 @@ plot(mpsz_sp, border=gray(.5))
 plot(skaterclust, coordinates(mpsz_3414_sp), cex.lab=.7,
      groups.colors=c("red","green","blue", "brown", "pink"), cex.circles=0.005, add=TRUE)
 ```
+
+### Visualising the clusters obtained using SKATER
 
 ```{r}
 groups_mat <- as.matrix(skaterclust$groups)

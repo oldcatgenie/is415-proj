@@ -19,6 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Import Required Libraries
 
+We use the following code chunk to install and load the following libraries:
+
+- tidyverse: for data cleaning and wrangling.
+- httr: to make HTTP GET requests to the OneMap Search API in order to collect the geometry for each postal code.
+- jsonlite: to manipulate the response of the HTTP GET requests, which is returned in JSON format.
+- readxl: to read excel files.
+
 ```{r}
 packages = c('tidyverse', 'httr', 'jsonlite', 'readxl')
 for (p in packages){
@@ -29,7 +36,9 @@ for (p in packages){
 }
 ```
 
-# Import Aspatial Data from Folder
+# Import and Prepare Aspatial Data
+
+The code chunk below defines *file_dir* and *file_list*, which will be passed in as function parameters for the later code chunks.
 
 ```{r}
 file_dir <- "data/aspatial/"
@@ -62,6 +71,17 @@ file_list <- c("acra-information-on-corporate-entities-a.csv",
                "acra-information-on-corporate-entities-z.csv")
 ```
 
+The following code chunk defines a function, *prep_data()*, which:
+
+1. Goes into the directory stated in *file_dir*,
+1. Loops through the files in the *file_list*,
+1. Filters the data to only include companies registered between *start_year* and *end_year*,
+1. Filters for Live Companies,
+1. Create or append to a dataframe known as ***results_csv***.
+1. After looping through every file in the *file_list*, it will write the resulting dataframe into a .csv file called ***sg_corp_info.csv***.
+
+As it successfully processes each file or when the function has been succecssfully executed, it will print the corresponding message.
+
 ```{r}
 prep_data <- function(file_dir, file_list, start_year, end_year) {
   for (file in file_list) {
@@ -87,9 +107,17 @@ prep_data <- function(file_dir, file_list, start_year, end_year) {
 }
 ```
 
+The following code chunk calls the *prep_data()* function defined in the code chunk above so that only Live Companies registered between the years 2017 and 2019 will remain, as these are the entities that are relevant to the project.
+
 ```{r}
 prep_data(file_dir, file_list, 2017, 2019)
 ```
+
+# Collect Data from OneMap API
+
+## Testing Requests using Sample Postal Code
+
+The following code chunk is used to derive the API call destination for a sample API call, to retrieve the geometry for the address code 579722.
 
 ```{r}
 corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
@@ -102,19 +130,28 @@ API_call <- paste0(baseURL, end_point, param_search, postal_code, other_param)
 API_call
 ```
 
+The following code chunk executes the API call using a HTTP GET request.
+
 ```{r}
 req <- GET(API_call)
 ```
+
+We then convert the JSON response using the code chunk below.
 
 ```{r}
 json <- content(req, as = "text")
 json_info <- fromJSON(json)
 ```
 
+We obtain the X-coordinates for the sample postal code using the code chunk below.
+
 ```{r}
 json_info$results["X"]
 ```
 
+## Defining Actual Function
+
+Now that we have tested out how to make an API call using a single postal code, let us define a function known as *call_onemap()* to "automate" the process for the many postal codes we have. This function takes in a parameter, the postal code, and returns a vector containing the X and Y-coordinates for that postal code respectively.
 
 ```{r}
 call_onemap <- function(postal_code) {
@@ -130,28 +167,23 @@ call_onemap <- function(postal_code) {
 }
 ```
 
+However, before calling the function, we want to avoid overloading OneMap's servers by reducing the number of unnecessary API calls. To do this, we import the just-created *sg-corp-info.csv* file, and find the unique postal codes. We than cast it as a data frame, and renamed the columns. We then create 2 new columns to hold the co-ordinates once we obtained it from the API. This is done in the code chunk below.
+
 ```{r}
 corp_info <- read_csv("data/aspatial/sg-corp-info.csv")
-```
 
-```{r}
 length(unique(corp_info$postal_code))
-```
 
-```{r}
 unique_postal_code <- as.data.frame(unique(corp_info$postal_code))
 colnames(unique_postal_code)[colnames(unique_postal_code) == "unique(corp_info$postal_code)"] <- "postal_code"
-```
 
-```{r}
 postal_code_geom <- unique_postal_code %>%
   mutate(X_coord = as.numeric(1.1), Y_coord = as.numeric(1.1))
 ```
 
-```{r}
-postal_code_geom <- read_csv("data/aspatial/postal_code_geom.csv")
-```
+Now, we can execute the function *call_onemap()* which we have defined earlier. The code chunk below converts every unique postal code value and calls the OneMap Search API and assigns the resulting coordinates into the respective fields. If no geometry was returned, NA is assigned instead. This code chunk also uses Sys.sleep() to impose rate limits so that the OneMap server will not experience a heavy server load.
 
+We decided to split the work into batches using the for loop, where we ran it multiple times, using a few thousand rows which is declared in line 189 instead of running everything once.
 
 ```{r warning=FALSE, message=FALSE}
 for (row_num in 20001:24217) {
@@ -177,17 +209,15 @@ for (row_num in 20001:24217) {
 }
 ```
 
-```{r}
-NA == as.numeric(1.1)
-```
+The result is then written to a .csv file named *postal_code_geom.csv*. If there are still rows not called using the function call above, the code chunk above is re-ran using a new batch of row numbers which is specified in the row num, at line 189.
 
 ```{r}
 write_csv(postal_code_geom, "data/aspatial/postal_code_geom.csv")
 ```
 
-<<<<<<< Updated upstream
-
 # Clean SSIC file, title based primary ssic code, remove columns that are redundant
+
+We use the following code chunk to prepare the SSIC Classification Information so that we can combine it with our other data files.
 
 ```{r}
 ssic <- read_excel('data/aspatial/ssic2020-classification-structure.xlsx')
@@ -222,7 +252,7 @@ ssic$`category`[ssic$`SSIC 2020` %in% c('97')] <- "T"
 ssic$`category`[ssic$`SSIC 2020` %in% c('99')] <- "U"
 ```
 
-# Clean SSIC file, title based A to U
+## Clean SSIC file, title based A to U
 
 ```{r}
 ssic1 <- read_excel('data/aspatial/ssic2020-classification-structure.xlsx')
@@ -234,7 +264,7 @@ ssic1 <- ssic1 %>%
 
 ```
 
-# Join both ssic dataframe, title based on category
+## Join both ssic dataframe, title based on category
 
 ```{r}
 ssic <- left_join(ssic,ssic1,by=c('category' = "SSIC 2020")) %>%
@@ -249,29 +279,40 @@ write_csv(ssic, "data/aspatial/ssic2020.csv")
 
 # Join corp_info with ssic categories and respective descriptions
 
+We use the following code chunk to join our Corporate Entity Information with the SSIC Classification Code based on their SSIC Code.
+
 ```{r}
 corp_info <- left_join(corp_info,ssic2020,by=c('primary_ssic_code' = "SSIC 2020"))
 names(corp_info)[names(corp_info) == 'primary_ssic_code.y'] <- 'primary_ssic_category_description'
-sum(is.na(corp_info))
 ```
+
+We use the following code chunk to check for any NA in our corp_info and postal_code_geom.
 
 ```{r}
+sum(is.na(corp_info))
 sum(is.na(postal_code_geom))
-
 ```
+
+We use the following code chunk to join our corporate entity information with the postal code geometry based on their postal code.
 
 ```{r}
 postal_code_geom$postal_code <- as.character(postal_code_geom$postal_code)
 corp_info <- left_join(corp_info,postal_code_geom,by=c('postal_code' = 'postal_code'))
 ```
 
+We then check if there are any NA values in the result.
+
 ```{r}
 sum(is.na(corp_info))
 ```
 
+Since there are NA values, which indicates that their co-ordinates could not be found using the OneMap API, we decided to drop these rows.
+
 ```{r}
 corp_info <- na.omit(corp_info)
 ```
+
+We then write the result to our *corp_info_merged.csv* file which will acts as a starting point for our spatial point patterns analysis and our geographic segmentation.
 
 ```{r}
 write_csv(corp_info, "data/aspatial/corp_info_merged.csv")
